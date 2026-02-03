@@ -1,0 +1,173 @@
+import React, { useMemo } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSessionBrowserStore } from '../store/sessionBrowserStore';
+import { wsClient } from '../services/websocket';
+import { SessionInfo } from '../types';
+import { SessionsScreenProps } from '../navigation/types';
+import { colors, spacing, typography, radius, animation } from '../theme';
+
+export default function SessionList() {
+  const navigation = useNavigation<SessionsScreenProps['navigation']>();
+  const route = useRoute<SessionsScreenProps['route']>();
+  const { workspaceDirName, workspaceDisplayPath } = route.params;
+
+  const {
+    sessions,
+    searchQuery,
+    loading,
+    setSearchQuery,
+  } = useSessionBrowserStore();
+
+  const filtered = useMemo(() => {
+    if (!searchQuery) return sessions;
+    const q = searchQuery.toLowerCase();
+    return sessions.filter(
+      (s) =>
+        s.firstPrompt.toLowerCase().includes(q) ||
+        s.summary.toLowerCase().includes(q)
+    );
+  }, [sessions, searchQuery]);
+
+  const handleSelect = (item: SessionInfo) => {
+    useSessionBrowserStore.getState().clearSessionData();
+    useSessionBrowserStore.getState().setLoading(true);
+    wsClient.requestSessionMessagesPage(workspaceDirName, item.sessionId);
+    wsClient.watchSession(workspaceDirName, item.sessionId);
+    navigation.navigate('Conversation', {
+      workspaceDirName,
+      sessionId: item.sessionId,
+    });
+  };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  };
+
+  const renderItem = ({ item }: { item: SessionInfo }) => (
+    <TouchableOpacity
+      style={styles.item}
+      onPress={() => handleSelect(item)}
+      activeOpacity={animation.activeOpacity}
+    >
+      <Text style={styles.prompt} numberOfLines={2}>
+        {item.firstPrompt || 'No prompt'}
+      </Text>
+      {item.summary ? (
+        <Text style={styles.summary} numberOfLines={1}>
+          {item.summary}
+        </Text>
+      ) : null}
+      <View style={styles.meta}>
+        <Text style={styles.metaText}>{item.messageCount} msgs</Text>
+        <Text style={styles.metaText}>{formatDate(item.modified)}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.backBtn}
+        onPress={() => navigation.goBack()}
+        activeOpacity={animation.activeOpacity}
+      >
+        <Text style={styles.backText}>← {workspaceDisplayPath || 'Back'}</Text>
+      </TouchableOpacity>
+      <TextInput
+        style={styles.search}
+        placeholder="Search sessions..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        autoCapitalize="none"
+        autoCorrect={false}
+        placeholderTextColor={colors.text.disabled}
+      />
+      {loading ? (
+        <ActivityIndicator style={styles.loader} size="large" color={colors.primary} />
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.sessionId}
+          renderItem={renderItem}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No sessions found</Text>
+          }
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+  backBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  backText: {
+    fontSize: typography.size.body,
+    color: colors.primary,
+    fontWeight: typography.weight.medium,
+  },
+  search: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.background.tertiary,
+    fontSize: typography.size.body,
+    color: colors.text.primary,
+  },
+  list: {
+    paddingHorizontal: spacing.md,
+  },
+  item: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border.secondary,
+  },
+  prompt: {
+    fontSize: typography.size.subheadline,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.primary,
+  },
+  summary: {
+    fontSize: typography.size.footnote,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+  },
+  meta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
+  metaText: {
+    fontSize: typography.size.caption,
+    color: colors.text.tertiary,
+  },
+  loader: {
+    marginTop: spacing.xxl,
+  },
+  empty: {
+    textAlign: 'center',
+    color: colors.text.tertiary,
+    marginTop: spacing.xxl,
+    fontSize: typography.size.subheadline,
+  },
+});
