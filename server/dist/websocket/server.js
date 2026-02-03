@@ -13,7 +13,7 @@ const browser_1 = require("../files/browser");
 const reader_1 = require("../files/reader");
 const search_1 = require("../files/search");
 const sessionBrowser_1 = require("../claude/sessionBrowser");
-const ssh_1 = require("../ssh");
+const terminal_1 = require("../terminal");
 const git_1 = require("../git");
 class WebSocketServer {
     constructor() {
@@ -21,7 +21,7 @@ class WebSocketServer {
         const server = (0, http_1.createServer)();
         this.wss = new ws_1.default.Server({ server });
         this.authManager = new auth_1.AuthManager();
-        this.sshHandler = new ssh_1.SSHHandler(this.send.bind(this));
+        this.terminalHandler = new terminal_1.LocalTerminalHandler(this.send.bind(this));
         this.gitHandler = new git_1.GitHandler(this.send.bind(this));
         this.setupWebSocket();
         server.listen(config_1.CONFIG.port, () => {
@@ -44,7 +44,7 @@ class WebSocketServer {
             ws.on('close', () => {
                 const clientId = this.getClientId(ws);
                 if (clientId) {
-                    this.sshHandler.cleanup(clientId);
+                    this.terminalHandler.cleanup(clientId);
                     (0, sessionBrowser_1.unwatchSession)(clientId);
                     this.clients.delete(clientId);
                     logger_1.logger.info(`Client ${clientId} disconnected`);
@@ -112,9 +112,9 @@ class WebSocketServer {
                     this.sendError(ws, 'Not authenticated');
                     return;
                 }
-                // Route SSH messages to sshHandler
-                if (this.sshHandler.canHandle(message.type)) {
-                    await this.sshHandler.handle(ws, clientId, message);
+                // Route terminal messages to terminalHandler
+                if (this.terminalHandler.canHandle(message.type)) {
+                    await this.terminalHandler.handle(ws, clientId, message);
                     return;
                 }
                 // Route Git messages to gitHandler

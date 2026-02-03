@@ -13,7 +13,6 @@ import { TerminalIcon, SessionsIcon, FilesIcon, MeIcon } from '../components/ui/
 import { useConnectionStore } from '../store/connectionStore';
 import { useFilesStore } from '../store/filesStore';
 import { wsClient } from '../services/websocket';
-import { sshService } from '../services/ssh';
 import { offlineCache } from '../services/offlineCache';
 import { ServerConfig } from '../types';
 import { colors, spacing, typography, animation } from '../theme';
@@ -45,7 +44,7 @@ export default function MainScreen() {
   const { disconnect, status } = useConnectionStore();
   const filesStore = useFilesStore();
 
-  const isConnected = status.ssh === 'connected' && status.ws === 'connected';
+  const isConnected = status.ws === 'connected';
 
   // 处理 Android 返回键/手势
   useEffect(() => {
@@ -90,7 +89,6 @@ export default function MainScreen() {
 
   const handleDisconnect = useCallback(() => {
     wsClient.disconnect();
-    sshService.disconnect();
     disconnect();
   }, [disconnect]);
 

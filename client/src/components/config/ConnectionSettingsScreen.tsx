@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useConnectionStore } from '../../store/connectionStore';
-import { sshService } from '../../services/ssh';
 import { wsClient } from '../../services/websocket';
 import { offlineCache } from '../../services/offlineCache';
 import { ServerConfig } from '../../types';
@@ -23,16 +22,13 @@ type Props = {
 
 export default function ConnectionSettingsScreen({ navigation }: Props) {
   const [host, setHost] = useState('10.10.10.146');
-  const [sshPort, setSshPort] = useState('22');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [wsPort, setWsPort] = useState('8080');
+  const [wsPort, setWsPort] = useState('9080');
   const [token, setToken] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const { setServer, setConnectionParams, status, disconnect } = useConnectionStore();
-  const isConnected = status.ssh === 'connected' && status.ws === 'connected';
+  const isConnected = status.ws === 'connected';
 
   useEffect(() => {
     loadLastServer();
@@ -43,9 +39,6 @@ export default function ConnectionSettingsScreen({ navigation }: Props) {
       const lastServer = await offlineCache.getLastServer();
       if (lastServer) {
         setHost(lastServer.host);
-        setSshPort(lastServer.sshPort.toString());
-        setUsername(lastServer.sshUsername);
-        setPassword(lastServer.sshPassword || '');
         setWsPort(lastServer.wsPort.toString());
         setToken(lastServer.wsToken);
       }
@@ -57,22 +50,21 @@ export default function ConnectionSettingsScreen({ navigation }: Props) {
   };
 
   const buildServerConfig = (): ServerConfig => {
-    const id = `${host}:${username}`;
+    const id = `${host}:${wsPort}`;
     return {
       id,
-      name: `${username}@${host}`,
+      name: host,
       host,
-      sshPort: parseInt(sshPort),
-      sshUsername: username,
-      sshPassword: password || undefined,
+      sshPort: 22, // Keep for compatibility
+      sshUsername: '',
       wsPort: parseInt(wsPort),
       wsToken: token,
     };
   };
 
   const handleSave = async () => {
-    if (!host || !username) {
-      Alert.alert('错误', '请填写主机和用户名');
+    if (!host) {
+      Alert.alert('错误', '请填写主机地址');
       return;
     }
 
@@ -82,8 +74,8 @@ export default function ConnectionSettingsScreen({ navigation }: Props) {
   };
 
   const handleConnect = async () => {
-    if (!host || !username) {
-      Alert.alert('错误', '请填写主机和用户名');
+    if (!host) {
+      Alert.alert('错误', '请填写主机地址');
       return;
     }
 
@@ -92,8 +84,6 @@ export default function ConnectionSettingsScreen({ navigation }: Props) {
     try {
       wsClient.connect(host, parseInt(wsPort), token);
       await wsClient.waitForConnection(10000);
-
-      await sshService.connect(host, parseInt(sshPort), username, { password });
 
       const serverConfig = buildServerConfig();
       await offlineCache.saveServer(serverConfig);
@@ -116,7 +106,6 @@ export default function ConnectionSettingsScreen({ navigation }: Props) {
 
   const handleDisconnect = () => {
     wsClient.disconnect();
-    sshService.disconnect();
     disconnect();
   };
 
@@ -132,7 +121,7 @@ export default function ConnectionSettingsScreen({ navigation }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.card}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>主机</Text>
+          <Text style={styles.label}>服务器地址</Text>
           <TextInput
             style={styles.input}
             placeholder="10.10.10.146"
@@ -144,64 +133,24 @@ export default function ConnectionSettingsScreen({ navigation }: Props) {
           />
         </View>
 
-        <View style={styles.inputRow}>
-          <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>SSH 端口</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="22"
-              value={sshPort}
-              onChangeText={setSshPort}
-              keyboardType="numeric"
-              editable={!isConnected}
-              placeholderTextColor={colors.text.disabled}
-            />
-          </View>
-          <View style={[styles.inputGroup, { flex: 1, marginLeft: spacing.md }]}>
-            <Text style={styles.label}>WS 端口</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="8080"
-              value={wsPort}
-              onChangeText={setWsPort}
-              keyboardType="numeric"
-              editable={!isConnected}
-              placeholderTextColor={colors.text.disabled}
-            />
-          </View>
-        </View>
-
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>用户名</Text>
+          <Text style={styles.label}>WebSocket 端口</Text>
           <TextInput
             style={styles.input}
-            placeholder="username"
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
+            placeholder="9080"
+            value={wsPort}
+            onChangeText={setWsPort}
+            keyboardType="numeric"
             editable={!isConnected}
             placeholderTextColor={colors.text.disabled}
           />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>密码</Text>
+          <Text style={styles.label}>认证令牌 (可选)</Text>
           <TextInput
             style={styles.input}
-            placeholder="(可选)"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!isConnected}
-            placeholderTextColor={colors.text.disabled}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>认证令牌</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="WebSocket 令牌"
+            placeholder="WebSocket 认证令牌"
             value={token}
             onChangeText={setToken}
             secureTextEntry
@@ -269,9 +218,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.base,
     marginBottom: spacing.base,
-  },
-  inputRow: {
-    flexDirection: 'row',
   },
   inputGroup: {
     marginBottom: spacing.md,

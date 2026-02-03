@@ -65,74 +65,48 @@ export interface ToolUseBlock {
   input: Record<string, any>;
 }
 
-// SSH Types
-// Client -> Server messages
-export interface SSHConnectMessage extends ClientMessage {
-  type: 'ssh_connect';
-  data: {
-    host: string;
-    port: number;
-    username: string;
-    privateKey?: string;
-    password?: string;
-  };
-}
+// Terminal Types
+export type TerminalType = 'shell' | 'claude';
 
-export interface SSHStartShellMessage extends ClientMessage {
-  type: 'ssh_start_shell';
-  data?: {
-    sessionId?: string;
+// Client -> Server messages
+export interface TerminalStartMessage extends ClientMessage {
+  type: 'terminal_start';
+  data: {
+    sessionId: string;
+    type?: TerminalType;  // 'shell' or 'claude', defaults to 'shell'
+    cwd?: string;
     cols?: number;
     rows?: number;
+    claudeArgs?: string[];  // Additional args for claude command
   };
 }
 
-export interface SSHInputMessage extends ClientMessage {
-  type: 'ssh_input';
+export interface TerminalInputMessage extends ClientMessage {
+  type: 'terminal_input';
   data: {
-    sessionId?: string;
+    sessionId: string;
     input: string;
   };
 }
 
-export interface SSHResizeMessage extends ClientMessage {
-  type: 'ssh_resize';
+export interface TerminalResizeMessage extends ClientMessage {
+  type: 'terminal_resize';
   data: {
-    sessionId?: string;
+    sessionId: string;
     cols: number;
     rows: number;
   };
 }
 
-export interface SSHCloseShellMessage extends ClientMessage {
-  type: 'ssh_close_shell';
+export interface TerminalCloseMessage extends ClientMessage {
+  type: 'terminal_close';
   data: {
     sessionId: string;
   };
 }
 
-export interface SSHListShellsMessage extends ClientMessage {
-  type: 'ssh_list_shells';
-}
-
-export interface SSHDisconnectMessage extends ClientMessage {
-  type: 'ssh_disconnect';
-}
-
-export interface SSHPortForwardMessage extends ClientMessage {
-  type: 'ssh_port_forward';
-  data: {
-    localPort: number;
-    remoteHost: string;
-    remotePort: number;
-  };
-}
-
-export interface SSHStopPortForwardMessage extends ClientMessage {
-  type: 'ssh_stop_port_forward';
-  data: {
-    localPort: number;
-  };
+export interface TerminalListMessage extends ClientMessage {
+  type: 'terminal_list';
 }
 
 // Git Types
@@ -154,59 +128,48 @@ export interface GitFileDiffMessage extends ClientMessage {
   staged?: boolean;
 }
 
-// Server -> Client messages
-export interface SSHConnectResponse extends ServerMessage {
-  type: 'ssh_connect_response';
+// Server -> Client messages (Terminal)
+export interface TerminalStartResponse extends ServerMessage {
+  type: 'terminal_start_response';
   data: {
     success: boolean;
+    sessionId: string;
+    terminalType?: TerminalType;
     message?: string;
   };
 }
 
-export interface SSHShellStartedMessage extends ServerMessage {
-  type: 'ssh_shell_started';
-  data: {
-    sessionId: string;
-  };
-}
-
-export interface SSHShellClosedMessage extends ServerMessage {
-  type: 'ssh_shell_closed';
-  data: {
-    sessionId: string;
-    success?: boolean;
-  };
-}
-
-export interface SSHOutputMessage extends ServerMessage {
-  type: 'ssh_output';
+export interface TerminalOutputMessage extends ServerMessage {
+  type: 'terminal_output';
   data: {
     sessionId: string;
     output: string;
-  } | string; // Support legacy format
-}
-
-export interface SSHListShellsResponse extends ServerMessage {
-  type: 'ssh_list_shells_response';
-  data: {
-    shells: string[];
   };
 }
 
-export interface SSHStatusMessage extends ServerMessage {
-  type: 'ssh_status';
+export interface TerminalClosedMessage extends ServerMessage {
+  type: 'terminal_closed';
   data: {
-    status: 'connected' | 'disconnected' | 'error';
-    message?: string;
+    sessionId: string;
   };
 }
 
-export interface SSHPortForwardResponse extends ServerMessage {
-  type: 'ssh_port_forward_response';
+export interface TerminalCloseResponse extends ServerMessage {
+  type: 'terminal_close_response';
   data: {
     success: boolean;
-    localPort: number;
-    message?: string;
+    sessionId: string;
+  };
+}
+
+export interface TerminalListResponse extends ServerMessage {
+  type: 'terminal_list_response';
+  data: {
+    terminals: Array<{
+      sessionId: string;
+      type: TerminalType;
+      createdAt: number;
+    }>;
   };
 }
 

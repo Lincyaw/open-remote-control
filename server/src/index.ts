@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { WebSocketServer } from './websocket/server';
 import { ClaudeWatcher } from './claude/watcher';
 import { createHttpServer } from './http/server';

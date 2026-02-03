@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSessionBrowserStore } from '../store/sessionBrowserStore';
@@ -19,6 +20,7 @@ export default function SessionList() {
   const navigation = useNavigation<SessionsScreenProps['navigation']>();
   const route = useRoute<SessionsScreenProps['route']>();
   const { workspaceDirName, workspaceDisplayPath } = route.params;
+  const [refreshing, setRefreshing] = useState(false);
 
   const {
     sessions,
@@ -26,6 +28,15 @@ export default function SessionList() {
     loading,
     setSearchQuery,
   } = useSessionBrowserStore();
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    wsClient.requestSessions(workspaceDirName);
+    // 延迟结束刷新状态，让用户看到刷新动画
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 800);
+  }, [workspaceDirName]);
 
   const filtered = useMemo(() => {
     if (!searchQuery) return sessions;
@@ -101,6 +112,14 @@ export default function SessionList() {
           keyExtractor={(item) => item.sessionId}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.text.secondary}
+              colors={[colors.primary]}
+            />
+          }
           ListEmptyComponent={
             <Text style={styles.empty}>No sessions found</Text>
           }

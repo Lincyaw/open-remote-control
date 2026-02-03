@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 
+export type TerminalType = 'shell' | 'claude';
+
 export interface TerminalSession {
   id: string;
   name: string;
+  type: TerminalType;
   createdAt: number;
   lastActiveAt: number;
   status: 'active' | 'connecting' | 'closed' | 'error';
@@ -12,7 +15,7 @@ interface TerminalSessionState {
   sessions: TerminalSession[];
   activeSessionId: string | null;
 
-  createSession: () => TerminalSession;
+  createSession: (type?: TerminalType) => TerminalSession;
   removeSession: (id: string) => void;
   setActiveSession: (id: string | null) => void;
   updateSessionStatus: (id: string, status: TerminalSession['status']) => void;
@@ -24,12 +27,15 @@ interface TerminalSessionState {
 
 let sessionCounter = 0;
 
-const generateSessionId = (): string => {
+const generateSessionId = (type: TerminalType): string => {
   sessionCounter++;
-  return `shell_${Date.now()}_${sessionCounter}`;
+  return `${type}_${Date.now()}_${sessionCounter}`;
 };
 
-const generateSessionName = (index: number): string => {
+const generateSessionName = (type: TerminalType, index: number): string => {
+  if (type === 'claude') {
+    return `Claude ${index}`;
+  }
   return `Shell ${index}`;
 };
 
@@ -37,15 +43,17 @@ export const useTerminalSessionStore = create<TerminalSessionState>((set, get) =
   sessions: [],
   activeSessionId: null,
 
-  createSession: () => {
-    const id = generateSessionId();
+  createSession: (type: TerminalType = 'shell') => {
+    const id = generateSessionId(type);
     const now = Date.now();
     const existingSessions = get().sessions;
-    const name = generateSessionName(existingSessions.length + 1);
+    const typeCount = existingSessions.filter(s => s.type === type).length;
+    const name = generateSessionName(type, typeCount + 1);
 
     const newSession: TerminalSession = {
       id,
       name,
+      type,
       createdAt: now,
       lastActiveAt: now,
       status: 'connecting',

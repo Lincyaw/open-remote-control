@@ -6,6 +6,7 @@ const sshManager_1 = require("./sshManager");
 /**
  * Handles SSH-related WebSocket messages.
  * Routes ssh_* messages to the appropriate SSHManager methods.
+ * Supports multiple shell sessions per client via sessionId.
  */
 class SSHHandler {
     constructor(sendFn) {
@@ -36,6 +37,12 @@ class SSHHandler {
                 break;
             case 'ssh_disconnect':
                 this.handleDisconnect(ws, clientId);
+                break;
+            case 'ssh_close_shell':
+                this.handleCloseShell(ws, clientId, message);
+                break;
+            case 'ssh_list_shells':
+                this.handleListShells(ws, clientId);
                 break;
             case 'ssh_port_forward':
                 await this.handlePortForward(ws, clientId, message);
@@ -76,16 +83,21 @@ class SSHHandler {
                 });
                 return;
             }
+            const sessionId = message.data?.sessionId || 'default';
             const cols = message.data?.cols || 80;
             const rows = message.data?.rows || 24;
-            await connection.startShell((data) => {
-                this.sendFn(ws, { type: 'ssh_output', data });
+            await connection.startShell(sessionId, (data) => {
+                this.sendFn(ws, { type: 'ssh_output', data: { sessionId, output: data } });
             }, () => {
                 this.sendFn(ws, {
-                    type: 'ssh_status',
-                    data: { status: 'disconnected', message: 'Shell closed' },
+                    type: 'ssh_shell_closed',
+                    data: { sessionId },
                 });
             }, cols, rows);
+            this.sendFn(ws, {
+                type: 'ssh_shell_started',
+                data: { sessionId },
+            });
         }
         catch (error) {
             logger_1.logger.error('SSH start shell error:', error);
@@ -98,14 +110,48 @@ class SSHHandler {
     handleInput(clientId, message) {
         const connection = sshManager_1.sshManager.getConnection(clientId);
         if (connection.isConnected()) {
-            connection.write(message.data.input);
+            const sessionId = message.data?.sessionId || 'default';
+            const input = message.data?.input || message.data;
+            // Try new API first, fall back to legacy
+            if (!connection.writeToShell(sessionId, typeof input === 'string' ? input : input.input)) {
+                // Legacy fallback
+                connection.write(typeof input === 'string' ? input : input.input);
+            }
         }
     }
     handleResize(clientId, message) {
         const connection = sshManager_1.sshManager.getConnection(clientId);
         if (connection.isConnected()) {
-            connection.resize(message.data.cols, message.data.rows);
+            const sessionId = message.data?.sessionId;
+            const cols = message.data.cols;
+            const rows = message.data.rows;
+            if (sessionId) {
+                connection.resizeShell(sessionId, cols, rows);
+            }
+            else {
+                // Legacy fallback
+                connection.resize(cols, rows);
+            }
         }
+    }
+    handleCloseShell(ws, clientId, message) {
+        const connection = sshManager_1.sshManager.getConnection(clientId);
+        const sessionId = message.data?.sessionId;
+        if (sessionId && connection.isConnected()) {
+            const closed = connection.closeShell(sessionId);
+            this.sendFn(ws, {
+                type: 'ssh_shell_closed',
+                data: { sessionId, success: closed },
+            });
+        }
+    }
+    handleListShells(ws, clientId) {
+        const connection = sshManager_1.sshManager.getConnection(clientId);
+        const shells = connection.isConnected() ? connection.getActiveShells() : [];
+        this.sendFn(ws, {
+            type: 'ssh_list_shells_response',
+            data: { shells },
+        });
     }
     handleDisconnect(ws, clientId) {
         sshManager_1.sshManager.removeConnection(clientId);

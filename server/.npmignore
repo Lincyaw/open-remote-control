@@ -1,0 +1,26 @@
+# Source files (use dist/ instead)
+src/
+tsconfig.json
+
+# Development
+.env
+.env.*
+nodemon.json
+
+# Tests
+__tests__/
+*.test.ts
+*.test.js
+jest.config.*
+coverage/
+
+# Scripts
+scripts/
+
+# Editor
+.vscode/
+.idea/
+
+# Misc
+*.log
+.DS_Store

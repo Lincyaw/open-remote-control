@@ -16,14 +16,15 @@ export default function TerminalTab() {
   const { status } = useConnectionStore();
   const { activeSessionId, setActiveSession, createSession } = useTerminalSessionStore();
 
-  const isConnected = status.ssh === 'connected' && status.ws === 'connected';
+  // Only need WebSocket connection, no SSH required
+  const isConnected = status.ws === 'connected';
 
   const handleCreateSession = useCallback(() => {
     if (!isConnected) {
       Alert.alert('未连接', '请先在"我的"页面连接服务器');
       return;
     }
-    createSession();
+    createSession('shell');
   }, [isConnected, createSession]);
 
   const handleSelectSession = useCallback((sessionId: string) => {

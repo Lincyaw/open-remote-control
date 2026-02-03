@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { createServer } from 'http';
+import { createServer, IncomingMessage } from 'http';
 import { CONFIG } from '../config';
 import { logger } from '../utils/logger';
 import { AuthManager } from './auth';
@@ -8,27 +8,48 @@ import { fileBrowser } from '../files/browser';
 import { fileReader } from '../files/reader';
 import { searchService } from '../files/search';
 import { listWorkspaces, listSessions, getSessionMessages, getSessionMessagesPage, watchSession, unwatchSession, listSubagents, getSubagentMessages, listToolResults, getToolResultContent, getSessionFolderInfo } from '../claude/sessionBrowser';
-import { SSHHandler } from '../ssh';
+import { LocalTerminalHandler } from '../terminal';
 import { GitHandler } from '../git';
+import { terminalWebSocketHandler } from '../terminal/terminalWebSocket';
 
 export class WebSocketServer {
   private wss: WebSocket.Server;
   private authManager: AuthManager;
   private clients = new Map<string, WebSocket>();
-  private sshHandler: SSHHandler;
+  private terminalHandler: LocalTerminalHandler;
   private gitHandler: GitHandler;
 
   constructor() {
     const server = createServer();
-    this.wss = new WebSocket.Server({ server });
+
+    // Use noServer mode for path-based routing
+    this.wss = new WebSocket.Server({ noServer: true });
     this.authManager = new AuthManager();
-    this.sshHandler = new SSHHandler(this.send.bind(this));
+    this.terminalHandler = new LocalTerminalHandler(this.send.bind(this));
     this.gitHandler = new GitHandler(this.send.bind(this));
+
+    // Handle HTTP upgrade requests
+    server.on('upgrade', (request: IncomingMessage, socket, head) => {
+      // Route /terminal to terminal direct WebSocket handler
+      if (terminalWebSocketHandler.shouldHandle(request)) {
+        const terminalWss = new WebSocket.Server({ noServer: true });
+        terminalWss.handleUpgrade(request, socket, head, (ws) => {
+          terminalWebSocketHandler.handleConnection(ws, request);
+        });
+      } else {
+        // Default: main WebSocket for JSON-RPC style messages
+        this.wss.handleUpgrade(request, socket, head, (ws) => {
+          this.wss.emit('connection', ws, request);
+        });
+      }
+    });
 
     this.setupWebSocket();
 
     server.listen(CONFIG.port, () => {
       logger.info(`WebSocket server running on port ${CONFIG.port}`);
+      logger.info(`  - Main API: ws://host:${CONFIG.port}/`);
+      logger.info(`  - Terminal direct: ws://host:${CONFIG.port}/terminal`);
     });
   }
 
@@ -49,7 +70,7 @@ export class WebSocketServer {
       ws.on('close', () => {
         const clientId = this.getClientId(ws);
         if (clientId) {
-          this.sshHandler.cleanup(clientId);
+          this.terminalHandler.cleanup(clientId);
           unwatchSession(clientId);
           this.clients.delete(clientId);
           logger.info(`Client ${clientId} disconnected`);
@@ -120,9 +141,9 @@ export class WebSocketServer {
           return;
         }
 
-        // Route SSH messages to sshHandler
-        if (this.sshHandler.canHandle(message.type)) {
-          await this.sshHandler.handle(ws, clientId, message);
+        // Route terminal messages to terminalHandler
+        if (this.terminalHandler.canHandle(message.type)) {
+          await this.terminalHandler.handle(ws, clientId, message);
           return;
         }
 

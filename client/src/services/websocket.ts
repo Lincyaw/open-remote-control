@@ -147,48 +147,24 @@ export class WebSocketClient {
         });
         break;
 
-      case 'ssh_output':
-        // Support both new format { sessionId, output } and legacy format (string)
-        if (typeof message.data === 'string') {
-          // Legacy: broadcast to all listeners with 'default' sessionId
-          this.emitter.emit('ssh_output', 'default', message.data);
-        } else {
-          this.emitter.emit('ssh_output', message.data.sessionId, message.data.output);
-        }
+      case 'terminal_output':
+        this.emitter.emit('terminal_output', message.data.sessionId, message.data.output);
         break;
 
-      case 'ssh_shell_started':
-        this.emitter.emit('ssh_shell_started', message.data.sessionId);
+      case 'terminal_start_response':
+        this.emitter.emit('terminal_start', message.data.success, message.data.sessionId, message.data.terminalType, message.data.message);
         break;
 
-      case 'ssh_shell_closed':
-        this.emitter.emit('ssh_shell_closed', message.data.sessionId);
+      case 'terminal_closed':
+        this.emitter.emit('terminal_closed', message.data.sessionId);
         break;
 
-      case 'ssh_list_shells_response':
-        this.emitter.emit('ssh_list_shells', message.data.shells);
+      case 'terminal_close_response':
+        this.emitter.emit('terminal_close', message.data.success, message.data.sessionId);
         break;
 
-      case 'ssh_connect_response':
-        this.emitter.emit('ssh_connect', message.data.success, message.data.message);
-        if (message.data.success) {
-          useConnectionStore.getState().setSSHStatus('connected');
-        } else {
-          useConnectionStore.getState().setSSHStatus('disconnected');
-        }
-        break;
-
-      case 'ssh_status':
-        this.emitter.emit('ssh_status', message.data.status, message.data.message);
-        if (message.data.status === 'connected') {
-          useConnectionStore.getState().setSSHStatus('connected');
-        } else if (message.data.status === 'disconnected') {
-          useConnectionStore.getState().setSSHStatus('disconnected');
-        }
-        break;
-
-      case 'ssh_port_forward_response':
-        this.emitter.emit('ssh_port_forward', message.data.success, message.data.localPort, message.data.message);
+      case 'terminal_list_response':
+        this.emitter.emit('terminal_list', message.data.terminals);
         break;
 
       case 'error':
@@ -409,32 +385,21 @@ export class WebSocketClient {
     });
   }
 
-  onShellData(callback: (sessionId: string, data: string) => void): () => void {
-    return this.emitter.on('ssh_output', callback);
+  // Terminal event subscriptions
+  onTerminalOutput(callback: (sessionId: string, data: string) => void): () => void {
+    return this.emitter.on('terminal_output', callback);
   }
 
-  onShellStarted(callback: (sessionId: string) => void): () => void {
-    return this.emitter.on('ssh_shell_started', callback);
+  onTerminalStarted(callback: (success: boolean, sessionId: string, terminalType?: string, message?: string) => void): () => void {
+    return this.emitter.on('terminal_start', callback);
   }
 
-  onShellClosed(callback: (sessionId: string) => void): () => void {
-    return this.emitter.on('ssh_shell_closed', callback);
+  onTerminalClosed(callback: (sessionId: string) => void): () => void {
+    return this.emitter.on('terminal_closed', callback);
   }
 
-  onShellsList(callback: (shells: string[]) => void): () => void {
-    return this.emitter.on('ssh_list_shells', callback);
-  }
-
-  onSSHConnect(callback: (success: boolean, message?: string) => void): () => void {
-    return this.emitter.on('ssh_connect', callback);
-  }
-
-  onSSHStatus(callback: (status: string, message?: string) => void): () => void {
-    return this.emitter.on('ssh_status', callback);
-  }
-
-  onSSHPortForward(callback: (success: boolean, localPort: number, message?: string) => void): () => void {
-    return this.emitter.on('ssh_port_forward', callback);
+  onTerminalList(callback: (terminals: Array<{ sessionId: string; type: string; createdAt: number }>) => void): () => void {
+    return this.emitter.on('terminal_list', callback);
   }
 
   disconnect() {

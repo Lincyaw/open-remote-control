@@ -38,11 +38,11 @@ const ssh2_1 = require("ssh2");
 const net = __importStar(require("net"));
 const logger_1 = require("../utils/logger");
 /**
- * Manages a single SSH connection with shell and port forwarding capabilities.
+ * Manages a single SSH connection with multiple shell sessions and port forwarding capabilities.
  */
 class SSHConnection {
     constructor() {
-        this.shell = null;
+        this.shells = new Map();
         this.portForwards = new Map();
         this.connected = false;
         this.client = new ssh2_1.Client();
@@ -85,16 +85,21 @@ class SSHConnection {
         });
     }
     /**
-     * Start an interactive PTY shell session.
+     * Start an interactive PTY shell session with a specific session ID.
+     * @param sessionId Unique identifier for this shell session
      * @param onData Callback for shell output data
      * @param onClose Callback when shell closes
      * @param cols Terminal columns (default 80)
      * @param rows Terminal rows (default 24)
      */
-    async startShell(onData, onClose, cols = 80, rows = 24) {
+    async startShell(sessionId, onData, onClose, cols = 80, rows = 24) {
         return new Promise((resolve, reject) => {
             if (!this.connected) {
                 reject(new Error('SSH not connected'));
+                return;
+            }
+            if (this.shells.has(sessionId)) {
+                reject(new Error(`Shell session ${sessionId} already exists`));
                 return;
             }
             this.client.shell({
@@ -103,40 +108,91 @@ class SSHConnection {
                 rows,
             }, (err, stream) => {
                 if (err) {
-                    logger_1.logger.error('Failed to start shell:', err);
+                    logger_1.logger.error(`Failed to start shell ${sessionId}:`, err);
                     reject(err);
                     return;
                 }
-                this.shell = stream;
+                this.shells.set(sessionId, stream);
                 stream.on('data', (data) => {
                     onData(data.toString());
                 });
                 stream.on('close', () => {
-                    this.shell = null;
+                    this.shells.delete(sessionId);
                     onClose();
                 });
                 stream.stderr.on('data', (data) => {
                     onData(data.toString());
                 });
-                logger_1.logger.info('SSH shell started');
+                logger_1.logger.info(`SSH shell ${sessionId} started`);
                 resolve();
             });
         });
     }
     /**
-     * Write data to the shell input.
+     * Write data to a specific shell session.
+     */
+    writeToShell(sessionId, data) {
+        const shell = this.shells.get(sessionId);
+        if (shell) {
+            shell.write(data);
+            return true;
+        }
+        return false;
+    }
+    /**
+     * Resize a specific shell's terminal window.
+     */
+    resizeShell(sessionId, cols, rows) {
+        const shell = this.shells.get(sessionId);
+        if (shell) {
+            shell.setWindow(rows, cols, 0, 0);
+            return true;
+        }
+        return false;
+    }
+    /**
+     * Close a specific shell session.
+     */
+    closeShell(sessionId) {
+        const shell = this.shells.get(sessionId);
+        if (shell) {
+            shell.close();
+            this.shells.delete(sessionId);
+            logger_1.logger.info(`SSH shell ${sessionId} closed`);
+            return true;
+        }
+        return false;
+    }
+    /**
+     * Get list of active shell session IDs.
+     */
+    getActiveShells() {
+        return Array.from(this.shells.keys());
+    }
+    /**
+     * Check if a shell session exists.
+     */
+    hasShell(sessionId) {
+        return this.shells.has(sessionId);
+    }
+    /**
+     * Legacy: Write data to the first available shell (backward compatibility).
+     * @deprecated Use writeToShell with sessionId instead
      */
     write(data) {
-        if (this.shell) {
-            this.shell.write(data);
+        const firstShell = this.shells.values().next().value;
+        if (firstShell) {
+            firstShell.write(data);
         }
     }
     /**
-     * Resize the terminal window.
+     * Legacy: Resize the first available shell (backward compatibility).
+     * @deprecated Use resizeShell with sessionId instead
      */
     resize(cols, rows) {
-        if (this.shell) {
-            this.shell.setWindow(rows, cols, 0, 0);
+        const firstShell = this.shells.values().next().value;
+        if (firstShell) {
+            firstShell.setWindow(rows, cols, 0, 0);
         }
     }
     /**
@@ -199,17 +255,18 @@ class SSHConnection {
      * Disconnect and clean up all resources.
      */
     disconnect() {
+        // Close all shell sessions
+        this.shells.forEach((shell, sessionId) => {
+            shell.close();
+            logger_1.logger.info(`Shell ${sessionId} closed`);
+        });
+        this.shells.clear();
         // Stop all port forwards
         this.portForwards.forEach((server, port) => {
             server.close();
             logger_1.logger.info(`Port forward stopped: localhost:${port}`);
         });
         this.portForwards.clear();
-        // Close shell if open
-        if (this.shell) {
-            this.shell.close();
-            this.shell = null;
-        }
         // End SSH connection
         if (this.connected) {
             this.client.end();

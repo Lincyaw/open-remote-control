@@ -8,7 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { TerminalSession, useTerminalSessionStore } from '../../store/terminalSessionStore';
-import { sshService } from '../../services/ssh';
+import { terminalService } from '../../services/terminal';
 import { colors, spacing, typography, radius, animation } from '../../theme';
 
 interface TerminalSessionListProps {
@@ -62,13 +62,21 @@ export default function TerminalSessionList({ onSelectSession }: TerminalSession
           text: '删除',
           style: 'destructive',
           onPress: () => {
-            sshService.closeShell(session.id);
+            terminalService.closeTerminal(session.id);
             removeSession(session.id);
           },
         },
       ]
     );
   }, [removeSession]);
+
+  const getTypeIcon = (type: TerminalSession['type']): string => {
+    return type === 'claude' ? '◈' : '>_';
+  };
+
+  const getTypeColor = (type: TerminalSession['type']): string => {
+    return type === 'claude' ? colors.primary : colors.success;
+  };
 
   const renderSession = useCallback(({ item }: { item: TerminalSession }) => (
     <TouchableOpacity
@@ -79,7 +87,9 @@ export default function TerminalSessionList({ onSelectSession }: TerminalSession
     >
       <View style={styles.sessionIcon}>
         <View style={styles.terminalIconBox}>
-          <Text style={styles.terminalIconCursor}>{'>_'}</Text>
+          <Text style={[styles.terminalIconCursor, { color: getTypeColor(item.type) }]}>
+            {getTypeIcon(item.type)}
+          </Text>
         </View>
       </View>
       <View style={styles.sessionInfo}>

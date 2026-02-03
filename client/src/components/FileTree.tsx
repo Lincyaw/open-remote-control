@@ -92,22 +92,6 @@ function FileTree({ tree, currentPath, onFileSelect, onBack }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Header with breadcrumb */}
-      <View style={styles.header}>
-        {currentPath.length > 0 && (
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={onBack}
-            activeOpacity={animation.activeOpacity}
-          >
-            <Text style={styles.backButtonText}>‹ Back</Text>
-          </TouchableOpacity>
-        )}
-        <Text style={styles.headerText} numberOfLines={1}>
-          {currentPath.length > 0 ? currentPath[currentPath.length - 1] : 'Files'}
-        </Text>
-      </View>
-
       {/* File list */}
       <FlatList
         data={items}

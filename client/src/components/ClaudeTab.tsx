@@ -15,7 +15,7 @@ export default function ClaudeTab() {
       screenOptions={{
         headerShown: false,
         gestureEnabled: true,
-        animation: 'slide_from_right',
+        animation: 'none',
       }}
     >
       <Stack.Screen name="Workspaces" component={WorkspaceList} />

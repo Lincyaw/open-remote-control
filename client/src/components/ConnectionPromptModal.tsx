@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useConnectionStore } from '../store/connectionStore';
-import { sshService } from '../services/ssh';
 import { wsClient } from '../services/websocket';
 import { offlineCache } from '../services/offlineCache';
 import { ServerConfig } from '../types';
@@ -34,13 +33,6 @@ export default function ConnectionPromptModal({ visible, onClose, serverConfig }
     try {
       wsClient.connect(serverConfig.host, serverConfig.wsPort, serverConfig.wsToken);
       await wsClient.waitForConnection(10000);
-
-      await sshService.connect(
-        serverConfig.host,
-        serverConfig.sshPort,
-        serverConfig.sshUsername,
-        { password: serverConfig.sshPassword }
-      );
 
       await offlineCache.setLastServer(serverConfig.id);
 
@@ -75,7 +67,7 @@ export default function ConnectionPromptModal({ visible, onClose, serverConfig }
           <View style={styles.serverInfo}>
             <Text style={styles.serverName}>{serverConfig.name}</Text>
             <Text style={styles.serverDetail}>
-              {serverConfig.host}:{serverConfig.sshPort}
+              {serverConfig.host}:{serverConfig.wsPort}
             </Text>
           </View>
 

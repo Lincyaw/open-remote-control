@@ -42,10 +42,32 @@ cd client && npm start
 
 # Terminal 3: Run app
 cd client && npm run ios  # or npm run android
+```
 
-# For Android device: set up port forwarding
-adb reverse tcp:8081 tcp:8081   # Metro
-adb reverse tcp:9080 tcp:9080   # WebSocket
+### Android Device Setup (macOS)
+
+**1. Environment variables** (add to `~/.zshrc` or `~/.bash_profile`):
+```bash
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17  # Requires Java 17
+```
+
+**2. Install Java 17** (required, Gradle doesn't support Java 25+):
+```bash
+brew install openjdk@17
+```
+
+**3. Port forwarding for USB debugging**:
+```bash
+adb reverse tcp:8081 tcp:8081   # Metro bundler
+adb reverse tcp:9080 tcp:9080   # WebSocket server
+```
+
+**4. Build and run**:
+```bash
+cd client && npm run android
 ```
 
 ## Architecture
