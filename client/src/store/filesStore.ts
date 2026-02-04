@@ -7,6 +7,8 @@ export interface FileNode {
   type: 'file' | 'directory';
   size?: number;
   children?: FileNode[];
+  hasChildren?: boolean;      // 是否有子节点（用于懒加载）
+  accessDenied?: boolean;     // 权限被拒绝标记
 }
 
 // Git file status
@@ -22,10 +24,17 @@ type ViewMode = 'normal' | 'git';
 interface FilesState {
   // Basic state
   fileTree: FileNode | null;
+  rootPath: string | null;       // Root path of the file tree
   selectedFile: string | null;
   currentPath: string[];
   loading: boolean;
   error: string | null;
+
+  // Lazy loading state
+  expandedDirs: Set<string>;     // 已展开的目录
+  loadingDirs: Set<string>;      // 正在加载的目录
+  truncated: boolean;            // 树是否被截断
+  accessErrors: string[];        // 权限错误列表
 
   // Git state
   viewMode: ViewMode;
@@ -37,13 +46,21 @@ interface FilesState {
   diffLoading: boolean;
 
   // Actions - Basic
-  setFileTree: (tree: FileNode | null) => void;
+  setFileTree: (tree: FileNode | null, rootPath?: string, truncated?: boolean, accessErrors?: string[]) => void;
   setSelectedFile: (path: string | null) => void;
   setCurrentPath: (path: string[]) => void;
   pushPath: (path: string) => void;
   popPath: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+
+  // Actions - Lazy loading
+  setExpandedDir: (path: string, expanded: boolean) => void;
+  setLoadingDir: (path: string, loading: boolean) => void;
+  setDirectoryChildren: (path: string, children: FileNode[], hasChildren?: boolean) => void;
+  setTruncated: (truncated: boolean) => void;
+  addAccessErrors: (errors: string[]) => void;
+  clearSubtree: (path: string) => void;
 
   // Actions - Git
   setViewMode: (mode: ViewMode) => void;
@@ -63,10 +80,17 @@ interface FilesState {
 export const useFilesStore = create<FilesState>((set, get) => ({
   // Initial state - Basic
   fileTree: null,
+  rootPath: null,
   selectedFile: null,
   currentPath: [],
   loading: true,
   error: null,
+
+  // Initial state - Lazy loading
+  expandedDirs: new Set<string>(),
+  loadingDirs: new Set<string>(),
+  truncated: false,
+  accessErrors: [],
 
   // Initial state - Git
   viewMode: 'normal',
@@ -78,13 +102,99 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   diffLoading: false,
 
   // Actions - Basic
-  setFileTree: (tree) => set({ fileTree: tree, loading: false, error: null }),
+  setFileTree: (tree, rootPath, truncated = false, accessErrors = []) => set({
+    fileTree: tree,
+    rootPath: rootPath ?? null,
+    truncated,
+    accessErrors,
+    loading: false,
+    error: null,
+    expandedDirs: new Set<string>(), // Reset expanded dirs on new tree
+    loadingDirs: new Set<string>(),
+  }),
   setSelectedFile: (path) => set({ selectedFile: path }),
   setCurrentPath: (path) => set({ currentPath: path }),
   pushPath: (path) => set((state) => ({ currentPath: [...state.currentPath, path] })),
   popPath: () => set((state) => ({ currentPath: state.currentPath.slice(0, -1) })),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error, loading: false }),
+
+  // Actions - Lazy loading
+  setExpandedDir: (path, expanded) => set((state) => {
+    const newSet = new Set(state.expandedDirs);
+    if (expanded) {
+      newSet.add(path);
+    } else {
+      newSet.delete(path);
+    }
+    return { expandedDirs: newSet };
+  }),
+  setLoadingDir: (path, loading) => set((state) => {
+    const newSet = new Set(state.loadingDirs);
+    if (loading) {
+      newSet.add(path);
+    } else {
+      newSet.delete(path);
+    }
+    return { loadingDirs: newSet };
+  }),
+  setDirectoryChildren: (path, children, hasChildren) => set((state) => {
+    if (!state.fileTree) return state;
+
+    // Helper function to recursively update the tree
+    const updateNode = (node: FileNode): FileNode => {
+      if (node.path === path) {
+        return {
+          ...node,
+          children,
+          hasChildren: hasChildren ?? (children.length > 0),
+        };
+      }
+      if (node.children) {
+        return {
+          ...node,
+          children: node.children.map(updateNode),
+        };
+      }
+      return node;
+    };
+
+    return { fileTree: updateNode(state.fileTree) };
+  }),
+  setTruncated: (truncated) => set({ truncated }),
+  addAccessErrors: (errors) => set((state) => ({
+    accessErrors: [...new Set([...state.accessErrors, ...errors])],
+  })),
+  clearSubtree: (path) => set((state) => {
+    if (!state.fileTree) return state;
+
+    // Helper function to clear children of a specific node
+    const clearNode = (node: FileNode): FileNode => {
+      if (node.path === path) {
+        return {
+          ...node,
+          children: undefined,
+          hasChildren: true, // Mark that it had children
+        };
+      }
+      if (node.children) {
+        return {
+          ...node,
+          children: node.children.map(clearNode),
+        };
+      }
+      return node;
+    };
+
+    // Remove from expanded dirs
+    const newExpandedDirs = new Set(state.expandedDirs);
+    newExpandedDirs.delete(path);
+
+    return {
+      fileTree: clearNode(state.fileTree),
+      expandedDirs: newExpandedDirs,
+    };
+  }),
 
   // Actions - Git
   setViewMode: (mode) => set({ viewMode: mode }),

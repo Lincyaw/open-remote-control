@@ -269,7 +269,26 @@ export class WebSocketClient {
         break;
 
       case 'file_tree_response':
-        useFilesStore.getState().setFileTree(message.data);
+        {
+          const { tree, rootPath, truncated, accessErrors } = message.data;
+          useFilesStore.getState().setFileTree(tree, rootPath, truncated, accessErrors);
+        }
+        break;
+
+      case 'file_tree_expand_response':
+        {
+          const { path, children, truncated, accessErrors } = message.data;
+          const store = useFilesStore.getState();
+          store.setLoadingDir(path, false);
+          store.setDirectoryChildren(path, children);
+          store.setExpandedDir(path, true);
+          if (truncated) {
+            store.setTruncated(true);
+          }
+          if (accessErrors && accessErrors.length > 0) {
+            store.addAccessErrors(accessErrors);
+          }
+        }
         break;
 
       case 'pong':
@@ -497,9 +516,14 @@ export class WebSocketClient {
     this.send({ type: 'git_check_repo', path });
   }
 
-  requestFileTree(path?: string) {
+  requestFileTree(path?: string, maxDepth?: number, maxNodes?: number) {
     useFilesStore.getState().setLoading(true);
-    this.send({ type: 'file_tree', path });
+    this.send({ type: 'file_tree', path, maxDepth, maxNodes });
+  }
+
+  requestExpandDirectory(path: string, rootPath?: string, maxDepth?: number, maxNodes?: number) {
+    useFilesStore.getState().setLoadingDir(path, true);
+    this.send({ type: 'file_tree_expand', path, rootPath, maxDepth, maxNodes });
   }
 
   requestGitStatus(path?: string) {

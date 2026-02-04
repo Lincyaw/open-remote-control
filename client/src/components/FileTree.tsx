@@ -5,32 +5,30 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
-import { colors, spacing, typography, radius, animation } from '../theme';
-
-interface FileNode {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  size?: number;
-  children?: FileNode[];
-}
+import { colors, spacing, typography, animation } from '../theme';
+import { useFilesStore, FileNode } from '../store/filesStore';
+import { wsClient } from '../services/websocket';
 
 interface Props {
   tree: FileNode | null;
   currentPath: string[];
   onFileSelect: (path: string, type: 'file' | 'directory') => void;
-  onBack: () => void;
+  onBack?: () => void; // Optional: kept for API compatibility
 }
 
-function FileTree({ tree, currentPath, onFileSelect, onBack }: Props) {
-  // Memoize current node calculation
-  const { currentNode, items } = useMemo(() => {
+function FileTree({ tree, currentPath, onFileSelect }: Props) {
+  const expandedDirs = useFilesStore((s) => s.expandedDirs);
+  const loadingDirs = useFilesStore((s) => s.loadingDirs);
+  const rootPath = useFilesStore((s) => s.rootPath);
+
+  // Navigate to current path in tree
+  const { items } = useMemo(() => {
     if (!tree) {
-      return { currentNode: null, items: [] };
+      return { items: [] };
     }
 
-    // Navigate to current path in tree
     let node = tree;
     for (const pathSegment of currentPath) {
       const child = node.children?.find(c => c.path === pathSegment);
@@ -41,44 +39,112 @@ function FileTree({ tree, currentPath, onFileSelect, onBack }: Props) {
       }
     }
 
-    return { currentNode: node, items: node.children || [] };
-  }, [tree, currentPath]);
+    // Build flat list: expanded directories show their children with indentation
+    const flatItems: Array<FileNode & { depth: number }> = [];
+
+    const addItems = (nodes: FileNode[], depth: number) => {
+      for (const item of nodes) {
+        flatItems.push({ ...item, depth });
+        if (
+          item.type === 'directory' &&
+          item.children &&
+          expandedDirs.has(item.path)
+        ) {
+          addItems(item.children, depth + 1);
+        }
+      }
+    };
+
+    addItems(node.children || [], 0);
+    return { items: flatItems };
+  }, [tree, currentPath, expandedDirs]);
+
+  const handleDirPress = useCallback(
+    (item: FileNode) => {
+      const store = useFilesStore.getState();
+      const isExpanded = store.expandedDirs.has(item.path);
+
+      if (isExpanded) {
+        // Collapse: clear subtree to free memory
+        store.clearSubtree(item.path);
+      } else if (item.children && item.children.length > 0) {
+        // Already have children loaded, just expand
+        store.setExpandedDir(item.path, true);
+      } else if (item.hasChildren !== false && !item.accessDenied) {
+        // Need to lazy load children
+        wsClient.requestExpandDirectory(item.path, rootPath || undefined);
+      }
+    },
+    [rootPath]
+  );
 
   const renderItem = useCallback(
-    ({ item }: { item: FileNode }) => {
+    ({ item }: { item: FileNode & { depth: number } }) => {
       const isDirectory = item.type === 'directory';
-      const icon = isDirectory ? '📁' : '📄';
+      const isExpanded = expandedDirs.has(item.path);
+      const isLoading = loadingDirs.has(item.path);
+
+      let icon: string;
+      if (item.accessDenied) {
+        icon = '🔒';
+      } else if (isDirectory) {
+        icon = isExpanded ? '📂' : '📁';
+      } else {
+        icon = '📄';
+      }
+
+      const showChevron =
+        isDirectory && !item.accessDenied && item.hasChildren !== false;
 
       return (
         <TouchableOpacity
-          style={styles.item}
-          onPress={() => onFileSelect(item.path, item.type)}
+          style={[styles.item, { paddingLeft: spacing.base + item.depth * 20 }]}
+          onPress={() => {
+            if (isDirectory) {
+              handleDirPress(item);
+            } else {
+              onFileSelect(item.path, item.type);
+            }
+          }}
           activeOpacity={animation.activeOpacity}
+          disabled={item.accessDenied}
         >
           <Text style={styles.icon}>{icon}</Text>
           <View style={styles.itemContent}>
-            <Text style={styles.itemName} numberOfLines={1}>
+            <Text
+              style={[
+                styles.itemName,
+                item.accessDenied && styles.itemNameDenied,
+              ]}
+              numberOfLines={1}
+            >
               {item.name}
             </Text>
             {item.size !== undefined && (
               <Text style={styles.itemSize}>{formatSize(item.size)}</Text>
             )}
+            {item.accessDenied && (
+              <Text style={styles.accessDeniedText}>Permission denied</Text>
+            )}
           </View>
-          {isDirectory && <Text style={styles.chevron}>›</Text>}
+          {isLoading && (
+            <ActivityIndicator
+              size="small"
+              color={colors.text.secondary}
+              style={styles.loadingIndicator}
+            />
+          )}
+          {showChevron && !isLoading && (
+            <Text style={styles.chevron}>{isExpanded ? '∨' : '›'}</Text>
+          )}
         </TouchableOpacity>
       );
     },
-    [onFileSelect]
+    [onFileSelect, handleDirPress, expandedDirs, loadingDirs]
   );
 
-  const keyExtractor = useCallback((item: FileNode) => item.path, []);
-
-  const getItemLayout = useCallback(
-    (_data: any, index: number) => ({
-      length: 60,
-      offset: 60 * index,
-      index,
-    }),
+  const keyExtractor = useCallback(
+    (item: FileNode & { depth: number }) => `${item.path}-${item.depth}`,
     []
   );
 
@@ -92,12 +158,10 @@ function FileTree({ tree, currentPath, onFileSelect, onBack }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* File list */}
       <FlatList
         data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        getItemLayout={getItemLayout}
         contentContainerStyle={styles.listContent}
         removeClippedSubviews
         maxToRenderPerBatch={10}
@@ -166,13 +230,24 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: spacing.xs,
   },
+  itemNameDenied: {
+    color: colors.text.secondary,
+    fontStyle: 'italic',
+  },
   itemSize: {
     fontSize: typography.size.caption,
     color: colors.text.secondary,
   },
+  accessDeniedText: {
+    fontSize: typography.size.caption,
+    color: colors.error,
+  },
   chevron: {
     fontSize: 24,
     color: colors.border.primary,
+    marginLeft: spacing.md,
+  },
+  loadingIndicator: {
     marginLeft: spacing.md,
   },
   emptyText: {

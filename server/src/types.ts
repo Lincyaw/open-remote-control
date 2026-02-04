@@ -26,6 +26,16 @@ export interface SearchMessage extends ClientMessage {
 export interface FileTreeMessage extends ClientMessage {
   type: 'file_tree';
   path?: string;
+  maxDepth?: number;
+  maxNodes?: number;
+}
+
+export interface FileTreeExpandMessage extends ClientMessage {
+  type: 'file_tree_expand';
+  rootPath?: string;  // Root path of the file tree
+  path: string;       // Directory path to expand (relative to rootPath)
+  maxDepth?: number;
+  maxNodes?: number;
 }
 
 // Server -> Client messages

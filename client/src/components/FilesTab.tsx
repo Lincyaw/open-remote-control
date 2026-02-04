@@ -22,6 +22,8 @@ export default function FilesTab() {
     diffContent,
     diffFilePath,
     diffLoading,
+    truncated,
+    accessErrors,
     setSelectedFile,
     pushPath,
     goBack,
@@ -87,6 +89,32 @@ export default function FilesTab() {
           {viewMode === 'normal' ? 'Git' : 'Files'}
         </Text>
       </TouchableOpacity>
+    );
+  };
+
+  // Render warning banner for truncated tree or access errors
+  const renderWarningBanner = () => {
+    if (!truncated && accessErrors.length === 0) return null;
+
+    return (
+      <View style={styles.warningBanner}>
+        {truncated && (
+          <View style={styles.warningItem}>
+            <Text style={styles.warningIcon}>⚠️</Text>
+            <Text style={styles.warningText}>
+              File tree truncated. Some directories not shown. Expand folders to load more.
+            </Text>
+          </View>
+        )}
+        {accessErrors.length > 0 && (
+          <View style={styles.warningItem}>
+            <Text style={styles.warningIcon}>🔒</Text>
+            <Text style={styles.warningText}>
+              {accessErrors.length} {accessErrors.length === 1 ? 'directory' : 'directories'} with permission denied
+            </Text>
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -158,6 +186,7 @@ export default function FilesTab() {
           {renderModeToggle()}
         </View>
       )}
+      {viewMode === 'normal' && renderWarningBanner()}
       <FileTree
         tree={fileTree}
         currentPath={currentPath}
@@ -215,5 +244,26 @@ const styles = StyleSheet.create({
     color: colors.text.inverse,
     fontSize: typography.size.footnote,
     fontWeight: typography.weight.semibold,
+  },
+  warningBanner: {
+    backgroundColor: colors.background.tertiary || '#FFF3CD',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.secondary,
+  },
+  warningItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.xs,
+  },
+  warningIcon: {
+    fontSize: 16,
+    marginRight: spacing.sm,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: typography.size.caption,
+    color: colors.text.secondary,
   },
 });

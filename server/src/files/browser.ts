@@ -8,6 +8,15 @@ export interface FileNode {
   type: 'file' | 'directory';
   size?: number;
   children?: FileNode[];
+  hasChildren?: boolean;      // 是否有子节点（用于懒加载）
+  accessDenied?: boolean;     // 权限被拒绝标记
+}
+
+export interface FileTreeResult {
+  tree: FileNode;
+  totalNodes: number;
+  truncated: boolean;
+  accessErrors: string[];
 }
 
 export class FileBrowser {
@@ -33,19 +42,55 @@ export class FileBrowser {
 
   /**
    * Generate file tree structure for a given directory
+   * @param rootPath - Root directory to scan
+   * @param maxDepth - Maximum depth to traverse (default: 3)
+   * @param maxNodes - Maximum number of nodes to return (default: 5000)
+   * @returns FileTreeResult with tree, totalNodes, truncated flag, and accessErrors
    */
-  async generateTree(rootPath: string, maxDepth = 5): Promise<FileNode> {
-    return this.buildTree(rootPath, rootPath, 0, maxDepth);
+  async generateTree(
+    rootPath: string,
+    maxDepth = 3,
+    maxNodes = 5000
+  ): Promise<FileTreeResult> {
+    const context = {
+      nodeCount: 0,
+      truncated: false,
+      accessErrors: [] as string[],
+    };
+
+    const tree = await this.buildTree(rootPath, rootPath, 0, maxDepth, maxNodes, context);
+
+    return {
+      tree,
+      totalNodes: context.nodeCount,
+      truncated: context.truncated,
+      accessErrors: context.accessErrors,
+    };
   }
 
   private async buildTree(
     rootPath: string,
     currentPath: string,
     depth: number,
-    maxDepth: number
+    maxDepth: number,
+    maxNodes: number,
+    context: { nodeCount: number; truncated: boolean; accessErrors: string[] }
   ): Promise<FileNode> {
+    // Check if we've hit the node limit
+    if (context.nodeCount >= maxNodes) {
+      context.truncated = true;
+      return {
+        name: '.',
+        path: '.',
+        type: 'directory',
+        hasChildren: true,
+      };
+    }
+
     const stats = await stat(currentPath);
     const name = currentPath === rootPath ? '.' : relative(rootPath, currentPath).split('/').pop() || '.';
+
+    context.nodeCount++;
 
     if (stats.isFile()) {
       return {
@@ -64,8 +109,19 @@ export class FileBrowser {
       children: [],
     };
 
-    // Stop at max depth
+    // Stop at max depth but indicate there might be children
     if (depth >= maxDepth) {
+      // Check if directory has children without reading all of them
+      try {
+        const entries = await readdir(currentPath);
+        const hasVisibleChildren = entries.some(
+          e => !this.ignoredDirs.has(e) && !this.ignoredFiles.has(e)
+        );
+        node.hasChildren = hasVisibleChildren;
+      } catch {
+        node.hasChildren = false;
+      }
+      delete node.children;
       return node;
     }
 
@@ -74,6 +130,12 @@ export class FileBrowser {
       const children: FileNode[] = [];
 
       for (const entry of entries) {
+        // Check node limit before processing each child
+        if (context.nodeCount >= maxNodes) {
+          context.truncated = true;
+          break;
+        }
+
         // Skip ignored directories and files
         if (this.ignoredDirs.has(entry) || this.ignoredFiles.has(entry)) {
           continue;
@@ -82,10 +144,43 @@ export class FileBrowser {
         const entryPath = join(currentPath, entry);
 
         try {
-          const childNode = await this.buildTree(rootPath, entryPath, depth + 1, maxDepth);
+          const childNode = await this.buildTree(
+            rootPath,
+            entryPath,
+            depth + 1,
+            maxDepth,
+            maxNodes,
+            context
+          );
           children.push(childNode);
-        } catch (error) {
-          logger.warn(`Failed to process ${entryPath}:`, error);
+        } catch (error: any) {
+          // Handle permission errors specifically
+          if (error?.code === 'EACCES' || error?.code === 'EPERM') {
+            const relativePath = relative(rootPath, entryPath);
+            context.accessErrors.push(relativePath);
+            // Add node with accessDenied flag
+            try {
+              const entryStat = await stat(entryPath).catch(() => null);
+              children.push({
+                name: entry,
+                path: relativePath,
+                type: entryStat?.isDirectory() ? 'directory' : 'file',
+                accessDenied: true,
+              });
+              context.nodeCount++;
+            } catch {
+              // If we can't even stat it, still add as directory with access denied
+              children.push({
+                name: entry,
+                path: relativePath,
+                type: 'directory',
+                accessDenied: true,
+              });
+              context.nodeCount++;
+            }
+          } else {
+            logger.warn(`Failed to process ${entryPath}:`, error);
+          }
         }
       }
 
@@ -96,11 +191,56 @@ export class FileBrowser {
         }
         return a.name.localeCompare(b.name);
       });
-    } catch (error) {
-      logger.error(`Failed to read directory ${currentPath}:`, error);
+    } catch (error: any) {
+      if (error?.code === 'EACCES' || error?.code === 'EPERM') {
+        const relativePath = relative(rootPath, currentPath) || '.';
+        context.accessErrors.push(relativePath);
+        node.accessDenied = true;
+        delete node.children;
+      } else {
+        logger.error(`Failed to read directory ${currentPath}:`, error);
+      }
     }
 
     return node;
+  }
+
+  /**
+   * Expand a single directory and return its immediate children
+   * Used for lazy loading in the client
+   * @param rootPath - The root path of the file tree
+   * @param dirPath - The directory path to expand (relative to rootPath)
+   * @param maxDepth - How many levels deep to scan (default: 1)
+   * @param maxNodes - Maximum nodes to return (default: 500)
+   */
+  async expandDirectory(
+    rootPath: string,
+    dirPath: string,
+    maxDepth = 1,
+    maxNodes = 500
+  ): Promise<FileTreeResult> {
+    const absolutePath = dirPath === '.' ? rootPath : join(rootPath, dirPath);
+    const context = {
+      nodeCount: 0,
+      truncated: false,
+      accessErrors: [] as string[],
+    };
+
+    const node = await this.buildTree(
+      rootPath,
+      absolutePath,
+      0,
+      maxDepth,
+      maxNodes,
+      context
+    );
+
+    return {
+      tree: node,
+      totalNodes: context.nodeCount,
+      truncated: context.truncated,
+      accessErrors: context.accessErrors,
+    };
   }
 
   /**

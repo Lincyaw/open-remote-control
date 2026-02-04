@@ -97,6 +97,9 @@ class WebSocketServer {
             case 'file_tree':
                 await this.handleFileTree(ws, message);
                 break;
+            case 'file_tree_expand':
+                await this.handleFileTreeExpand(ws, message);
+                break;
             case 'file_read':
                 await this.handleFileRead(ws, message);
                 break;
@@ -167,15 +170,56 @@ class WebSocketServer {
         }
         try {
             const path = message.path || process.cwd();
-            const tree = await browser_1.fileBrowser.generateTree(path);
+            const maxDepth = message.maxDepth ?? config_1.CONFIG.fileTreeMaxDepth;
+            const maxNodes = message.maxNodes ?? config_1.CONFIG.fileTreeMaxNodes;
+            const result = await browser_1.fileBrowser.generateTree(path, maxDepth, maxNodes);
             this.send(ws, {
                 type: 'file_tree_response',
-                data: tree,
+                data: {
+                    tree: result.tree,
+                    totalNodes: result.totalNodes,
+                    truncated: result.truncated,
+                    accessErrors: result.accessErrors,
+                    rootPath: path,
+                },
             });
         }
         catch (error) {
             logger_1.logger.error('Error generating file tree:', error);
             this.sendError(ws, `Failed to generate file tree: ${error}`);
+        }
+    }
+    async handleFileTreeExpand(ws, message) {
+        const clientId = this.getClientId(ws);
+        if (!clientId) {
+            this.sendError(ws, 'Not authenticated');
+            return;
+        }
+        try {
+            const { path, rootPath } = message;
+            if (!path) {
+                this.sendError(ws, 'Directory path is required');
+                return;
+            }
+            const actualRootPath = rootPath || process.cwd();
+            const maxDepth = message.maxDepth ?? 1;
+            const maxNodes = message.maxNodes ?? config_1.CONFIG.fileTreeExpandMaxNodes;
+            const result = await browser_1.fileBrowser.expandDirectory(actualRootPath, path, maxDepth, maxNodes);
+            this.send(ws, {
+                type: 'file_tree_expand_response',
+                data: {
+                    path,
+                    children: result.tree.children || [],
+                    hasChildren: result.tree.hasChildren,
+                    totalNodes: result.totalNodes,
+                    truncated: result.truncated,
+                    accessErrors: result.accessErrors,
+                },
+            });
+        }
+        catch (error) {
+            logger_1.logger.error('Error expanding directory:', error);
+            this.sendError(ws, `Failed to expand directory: ${error}`);
         }
     }
     async handleFileRead(ws, message) {

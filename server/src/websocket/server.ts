@@ -3,7 +3,7 @@ import { createServer, IncomingMessage } from 'http';
 import { CONFIG } from '../config';
 import { logger } from '../utils/logger';
 import { AuthManager } from './auth';
-import { ClientMessage, ServerMessage } from '../types';
+import { ClientMessage, ServerMessage, FileTreeExpandMessage } from '../types';
 import { fileBrowser } from '../files/browser';
 import { fileReader } from '../files/reader';
 import { searchService } from '../files/search';
@@ -106,6 +106,9 @@ export class WebSocketServer {
       case 'file_tree':
         await this.handleFileTree(ws, message);
         break;
+      case 'file_tree_expand':
+        await this.handleFileTreeExpand(ws, message as FileTreeExpandMessage);
+        break;
       case 'file_read':
         await this.handleFileRead(ws, message);
         break;
@@ -181,15 +184,66 @@ export class WebSocketServer {
 
     try {
       const path = message.path || process.cwd();
-      const tree = await fileBrowser.generateTree(path);
+      const maxDepth = message.maxDepth ?? CONFIG.fileTreeMaxDepth;
+      const maxNodes = message.maxNodes ?? CONFIG.fileTreeMaxNodes;
+
+      const result = await fileBrowser.generateTree(path, maxDepth, maxNodes);
 
       this.send(ws, {
         type: 'file_tree_response',
-        data: tree,
+        data: {
+          tree: result.tree,
+          totalNodes: result.totalNodes,
+          truncated: result.truncated,
+          accessErrors: result.accessErrors,
+          rootPath: path,
+        },
       });
     } catch (error) {
       logger.error('Error generating file tree:', error);
       this.sendError(ws, `Failed to generate file tree: ${error}`);
+    }
+  }
+
+  private async handleFileTreeExpand(ws: WebSocket, message: FileTreeExpandMessage) {
+    const clientId = this.getClientId(ws);
+    if (!clientId) {
+      this.sendError(ws, 'Not authenticated');
+      return;
+    }
+
+    try {
+      const { path, rootPath } = message;
+      if (!path) {
+        this.sendError(ws, 'Directory path is required');
+        return;
+      }
+
+      const actualRootPath = rootPath || process.cwd();
+      const maxDepth = message.maxDepth ?? 1;
+      const maxNodes = message.maxNodes ?? CONFIG.fileTreeExpandMaxNodes;
+
+      const result = await fileBrowser.expandDirectory(
+        actualRootPath,
+        path,
+        maxDepth,
+        maxNodes
+      );
+
+      this.send(ws, {
+        type: 'file_tree_expand_response',
+        data: {
+          path,
+          children: result.tree.children || [],
+          hasChildren: result.tree.hasChildren,
+          totalNodes: result.totalNodes,
+          truncated: result.truncated,
+          accessErrors: result.accessErrors,
+        },
+      });
+    } catch (error) {
+      logger.error('Error expanding directory:', error);
+      this.sendError(ws, `Failed to expand directory: ${error}`);
     }
   }
 
