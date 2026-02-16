@@ -59,6 +59,7 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const lastSizeRef = useRef({ cols: 0, rows: 0 });
   const pasteInputRef = useRef<HTMLTextAreaElement>(null);
+  const mountedRef = useRef(false);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [ctrlActive, setCtrlActive] = useState(false);
   const ctrlActiveRef = useRef(false);
@@ -102,6 +103,9 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
 
   useEffect(() => {
     if (!termRef.current || !containerRef.current || !connectionParams) return;
+
+    // Mark as mounted
+    mountedRef.current = true;
 
     const term = new Terminal({
       cursorBlink: true,
@@ -162,6 +166,8 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      // Only update if still mounted (prevent StrictMode issues)
+      if (!mountedRef.current) return;
       setStatus('connected');
       updateSessionStatus(sessionId, 'active');
       // Send actual size after fit
@@ -169,17 +175,22 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
     };
 
     ws.onmessage = (event) => {
+      if (!mountedRef.current) return;
       if (event.data instanceof ArrayBuffer) return;
       term.write(event.data);
     };
 
     ws.onclose = () => {
+      // Only update if still mounted (prevent StrictMode issues)
+      if (!mountedRef.current) return;
       setStatus('error');
       updateSessionStatus(sessionId, 'closed');
       term.write('\r\n\x1b[33m[Connection closed]\x1b[0m\r\n');
     };
 
     ws.onerror = () => {
+      // Only update if still mounted (prevent StrictMode issues)
+      if (!mountedRef.current) return;
       setStatus('error');
       updateSessionStatus(sessionId, 'error');
     };
@@ -210,9 +221,23 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
     observer.observe(container);
 
     return () => {
+      // Mark as unmounted to prevent handlers from running
+      mountedRef.current = false;
+
       inputDisposable.dispose();
       observer.disconnect();
-      ws.close();
+
+      // Close WebSocket safely - some browsers (iPad Safari) may log errors
+      // if we close a connecting socket due to React StrictMode double-invoke
+      try {
+        if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+          ws.close();
+        }
+      } catch (err) {
+        // Ignore errors when closing - can happen in StrictMode
+        console.debug('WebSocket close error (safe to ignore):', err);
+      }
+
       term.dispose();
       wsRef.current = null;
       terminalRef.current = null;
