@@ -68,7 +68,7 @@ export default function GitFileList({ onFileSelect, workspacePath }: Props) {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto pb-16">
       {staged.length > 0 && (
         <>
           <div className="px-3 py-1.5 text-xs font-medium text-green-400 bg-green-900/20 border-b border-gray-800">

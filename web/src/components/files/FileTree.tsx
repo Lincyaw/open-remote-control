@@ -105,7 +105,7 @@ export default function FileTree({ onFileSelect }: Props) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto font-mono">
+      <div className="flex-1 overflow-y-auto font-mono pb-16">
         {fileTree.children?.map((child) => (
           <TreeNode
             key={child.path}
