@@ -31,6 +31,9 @@ export class GitHandler {
       case 'git_check_repo':
         await this.handleCheckRepo(ws, message);
         break;
+      case 'git_commit':
+        await this.handleCommit(ws, message);
+        break;
       case 'git_stage':
         await this.handleStage(ws, message);
         break;
@@ -78,6 +81,25 @@ export class GitHandler {
       this.sendFn(ws, {
         type: 'error',
         error: `Failed to get git status: ${error.message}`,
+      });
+    }
+  }
+
+  private async handleCommit(ws: WebSocket, message: ClientMessage): Promise<void> {
+    try {
+      const workingDir = message.path || process.cwd();
+      const { commitMessage, mode } = message;
+      const result = await gitService.commit(workingDir, commitMessage || '', mode || 'commit');
+      const files = await gitService.getStatus(workingDir);
+      this.sendFn(ws, {
+        type: 'git_commit_response',
+        data: { success: true, output: result, files },
+      });
+    } catch (error: any) {
+      logger.error('Git commit error:', error);
+      this.sendFn(ws, {
+        type: 'git_commit_response',
+        data: { success: false, output: error.message },
       });
     }
   }
