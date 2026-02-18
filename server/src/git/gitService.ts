@@ -266,6 +266,37 @@ export class GitService {
   }
 
   /**
+   * Stage a file (git add).
+   */
+  async stageFile(workingDir: string, filePath: string): Promise<void> {
+    const repoRoot = await this.getRepoRoot(workingDir);
+    const cwd = repoRoot || workingDir;
+    await execFileAsync('git', ['add', '--', filePath], { cwd });
+  }
+
+  /**
+   * Unstage a file (git restore --staged).
+   */
+  async unstageFile(workingDir: string, filePath: string): Promise<void> {
+    const repoRoot = await this.getRepoRoot(workingDir);
+    const cwd = repoRoot || workingDir;
+    await execFileAsync('git', ['restore', '--staged', '--', filePath], { cwd });
+  }
+
+  /**
+   * Discard unstaged changes for a file (git restore or git clean for untracked).
+   */
+  async discardFile(workingDir: string, filePath: string, status: string): Promise<void> {
+    const repoRoot = await this.getRepoRoot(workingDir);
+    const cwd = repoRoot || workingDir;
+    if (status === 'untracked') {
+      await execFileAsync('git', ['clean', '-f', '--', filePath], { cwd });
+    } else {
+      await execFileAsync('git', ['restore', '--', filePath], { cwd });
+    }
+  }
+
+  /**
    * Check if a file is binary by looking at the first few bytes.
    */
   private async isBinaryFile(filePath: string): Promise<boolean> {

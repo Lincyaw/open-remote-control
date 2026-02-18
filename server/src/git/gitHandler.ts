@@ -31,6 +31,15 @@ export class GitHandler {
       case 'git_check_repo':
         await this.handleCheckRepo(ws, message);
         break;
+      case 'git_stage':
+        await this.handleStage(ws, message);
+        break;
+      case 'git_unstage':
+        await this.handleUnstage(ws, message);
+        break;
+      case 'git_discard':
+        await this.handleDiscard(ws, message);
+        break;
       default:
         logger.warn(`Unknown git message type: ${message.type}`);
     }
@@ -70,6 +79,57 @@ export class GitHandler {
         type: 'error',
         error: `Failed to get git status: ${error.message}`,
       });
+    }
+  }
+
+  private async handleStage(ws: WebSocket, message: ClientMessage): Promise<void> {
+    try {
+      const workingDir = message.path || process.cwd();
+      const { filePath } = message;
+      if (!filePath) {
+        this.sendFn(ws, { type: 'error', error: 'File path is required for git stage' });
+        return;
+      }
+      await gitService.stageFile(workingDir, filePath);
+      const files = await gitService.getStatus(workingDir);
+      this.sendFn(ws, { type: 'git_status_response', data: { files } });
+    } catch (error: any) {
+      logger.error('Git stage error:', error);
+      this.sendFn(ws, { type: 'error', error: `Failed to stage file: ${error.message}` });
+    }
+  }
+
+  private async handleUnstage(ws: WebSocket, message: ClientMessage): Promise<void> {
+    try {
+      const workingDir = message.path || process.cwd();
+      const { filePath } = message;
+      if (!filePath) {
+        this.sendFn(ws, { type: 'error', error: 'File path is required for git unstage' });
+        return;
+      }
+      await gitService.unstageFile(workingDir, filePath);
+      const files = await gitService.getStatus(workingDir);
+      this.sendFn(ws, { type: 'git_status_response', data: { files } });
+    } catch (error: any) {
+      logger.error('Git unstage error:', error);
+      this.sendFn(ws, { type: 'error', error: `Failed to unstage file: ${error.message}` });
+    }
+  }
+
+  private async handleDiscard(ws: WebSocket, message: ClientMessage): Promise<void> {
+    try {
+      const workingDir = message.path || process.cwd();
+      const { filePath, fileStatus } = message;
+      if (!filePath) {
+        this.sendFn(ws, { type: 'error', error: 'File path is required for git discard' });
+        return;
+      }
+      await gitService.discardFile(workingDir, filePath, fileStatus || 'modified');
+      const files = await gitService.getStatus(workingDir);
+      this.sendFn(ws, { type: 'git_status_response', data: { files } });
+    } catch (error: any) {
+      logger.error('Git discard error:', error);
+      this.sendFn(ws, { type: 'error', error: `Failed to discard changes: ${error.message}` });
     }
   }
 

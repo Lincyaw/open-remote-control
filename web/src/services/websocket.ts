@@ -443,6 +443,15 @@ export class WebSocketClient {
     useFilesStore.getState().setDiffLoading(true);
     this.send({ type: 'git_file_diff', filePath, staged, path });
   }
+  requestGitStage(filePath: string, path?: string) {
+    this.send({ type: 'git_stage', filePath, path });
+  }
+  requestGitUnstage(filePath: string, path?: string) {
+    this.send({ type: 'git_unstage', filePath, path });
+  }
+  requestGitDiscard(filePath: string, fileStatus: string, path?: string) {
+    this.send({ type: 'git_discard', filePath, fileStatus, path });
+  }
   requestSearch(query: string, path?: string, options?: { maxResults?: number }) {
     useFilesStore.getState().setSearchLoading(true);
     this.send({ type: 'search', query, path, options });
