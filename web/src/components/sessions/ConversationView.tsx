@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
@@ -190,6 +190,7 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const {
     messages, loading, subagents, sessionFolderInfo,
@@ -217,8 +218,30 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
     return () => unsubscribe();
   }, [workspaceDirName, currentSessionId]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // On mount, restore saved scroll position if any (set before navigating to tool view)
+  const initialScrollHandled = useRef(false);
+  useLayoutEffect(() => {
+    const saved = useSessionBrowserStore.getState().savedScrollTop;
+    if (saved !== null) {
+      useSessionBrowserStore.getState().setSavedScrollTop(null);
+      // Defer until the scroll container has content
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = saved;
+        }
+        initialScrollHandled.current = true;
+      });
+    } else {
+      initialScrollHandled.current = false;
+    }
+  }, []);
+
+  // Auto-scroll to bottom when new messages arrive (skip initial mount if restoring)
   useEffect(() => {
+    if (!initialScrollHandled.current) {
+      initialScrollHandled.current = true;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
@@ -280,6 +303,19 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
     setInputMessage('');
   }, [inputMessage, isSending, workspaceDirName, currentSessionId, allowedTools]);
 
+  const handleSendMessageWithText = useCallback((text: string) => {
+    if (isSending) return;
+    setIsSending(true);
+    setInputMessage('');
+    wsClient.sendClaudeMessage(
+      workspaceDirName,
+      currentSessionId,
+      undefined,
+      text,
+      allowedTools.length > 0 ? allowedTools : undefined
+    );
+  }, [isSending, workspaceDirName, currentSessionId, allowedTools]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -292,6 +328,13 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
       prev.includes(tool) ? prev.filter(t => t !== tool) : [...prev, tool]
     );
   };
+
+  const handleToolPressWithScroll = useCallback((toolUse: SessionMessage, toolResult?: SessionMessage) => {
+    if (scrollContainerRef.current) {
+      useSessionBrowserStore.getState().setSavedScrollTop(scrollContainerRef.current.scrollTop);
+    }
+    onToolPress(toolUse, toolResult);
+  }, [onToolPress]);
 
   const subagentCount = sessionFolderInfo?.subagentCount || subagents.length;
 
@@ -424,7 +467,7 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
               <MessageBubble
                 item={msg}
                 allMessages={messages}
-                onToolPress={onToolPress}
+                onToolPress={handleToolPressWithScroll}
               />
             </div>
           ))}
@@ -479,6 +522,38 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
           </div>
         )}
 
+        {/* Permission quick-response buttons */}
+        {!isNewConversation && !isSending && (
+          <div className="flex gap-1.5 mb-2">
+            <button
+              onClick={() => handleSendMessageWithText('y')}
+              className="text-xs px-2.5 py-1 rounded bg-green-800/50 text-green-300 hover:bg-green-700/60 border border-green-700/50 transition-colors"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => handleSendMessageWithText('a')}
+              className="text-xs px-2.5 py-1 rounded bg-green-900/40 text-green-400 hover:bg-green-800/50 border border-green-800/50 transition-colors"
+            >
+              Yes Always
+            </button>
+            <button
+              onClick={() => {
+                setInputMessage('n');
+                setTimeout(() => {
+                  if (textareaRef.current) {
+                    textareaRef.current.focus();
+                    textareaRef.current.setSelectionRange(1, 1);
+                  }
+                }, 0);
+              }}
+              className="text-xs px-2.5 py-1 rounded bg-red-900/40 text-red-400 hover:bg-red-800/50 border border-red-800/50 transition-colors"
+            >
+              No
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-2 items-end">
           <button
             onClick={() => setShowPermissions(!showPermissions)}
@@ -488,6 +563,7 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
             *
           </button>
           <textarea
+            ref={textareaRef}
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
