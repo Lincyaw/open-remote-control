@@ -16,6 +16,7 @@ interface SessionBrowserState {
   toolResults: ToolResultFile[];
   toolResultContents: Record<string, string>;
   sessionFolderInfo: SessionFolderInfo | null;
+  savedScrollTop: number | null;
 
   setWorkspaces: (workspaces: WorkspaceInfo[]) => void;
   setSessions: (sessions: SessionInfo[]) => void;
@@ -33,6 +34,7 @@ interface SessionBrowserState {
   setToolResults: (results: ToolResultFile[]) => void;
   setToolResultContent: (toolUseId: string, content: string) => void;
   setSessionFolderInfo: (info: SessionFolderInfo) => void;
+  setSavedScrollTop: (scrollTop: number | null) => void;
   clearSessionData: () => void;
 }
 
@@ -51,6 +53,7 @@ export const useSessionBrowserStore = create<SessionBrowserState>((set) => ({
   toolResults: [],
   toolResultContents: {},
   sessionFolderInfo: null,
+  savedScrollTop: null,
 
   setWorkspaces: (workspaces) => set({ workspaces, loading: false }),
   setSessions: (sessions) => set({ sessions, loading: false }),
@@ -74,6 +77,7 @@ export const useSessionBrowserStore = create<SessionBrowserState>((set) => ({
       toolResultContents: { ...state.toolResultContents, [toolUseId]: content },
     })),
   setSessionFolderInfo: (info) => set({ sessionFolderInfo: info }),
+  setSavedScrollTop: (savedScrollTop) => set({ savedScrollTop }),
   clearSessionData: () =>
     set({
       messages: [],

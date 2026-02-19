@@ -266,6 +266,77 @@ export class GitService {
   }
 
   /**
+   * Commit staged changes.
+   * mode: 'commit' | 'amend' | 'push' | 'sync'
+   * For 'amend', message can be empty to reuse the last commit message (--no-edit).
+   * 'push' = commit then push.
+   * 'sync' = commit, pull --rebase, push.
+   */
+  async commit(workingDir: string, message: string, mode: 'commit' | 'amend' | 'push' | 'sync'): Promise<string> {
+    const repoRoot = await this.getRepoRoot(workingDir);
+    const cwd = repoRoot || workingDir;
+
+    // Build commit args
+    if (mode === 'amend') {
+      const args = message.trim()
+        ? ['commit', '--amend', '-m', message]
+        : ['commit', '--amend', '--no-edit'];
+      const { stdout } = await execFileAsync('git', args, { cwd });
+      return stdout.trim();
+    }
+
+    if (!message.trim()) {
+      throw new Error('Commit message is required');
+    }
+
+    const { stdout: commitOut } = await execFileAsync('git', ['commit', '-m', message], { cwd });
+
+    if (mode === 'push') {
+      await execFileAsync('git', ['push'], { cwd });
+      return commitOut.trim() + '\nPushed successfully.';
+    }
+
+    if (mode === 'sync') {
+      await execFileAsync('git', ['pull', '--rebase'], { cwd });
+      await execFileAsync('git', ['push'], { cwd });
+      return commitOut.trim() + '\nSynced successfully.';
+    }
+
+    return commitOut.trim();
+  }
+
+  /**
+   * Stage a file (git add).
+   */
+  async stageFile(workingDir: string, filePath: string): Promise<void> {
+    const repoRoot = await this.getRepoRoot(workingDir);
+    const cwd = repoRoot || workingDir;
+    await execFileAsync('git', ['add', '--', filePath], { cwd });
+  }
+
+  /**
+   * Unstage a file (git restore --staged).
+   */
+  async unstageFile(workingDir: string, filePath: string): Promise<void> {
+    const repoRoot = await this.getRepoRoot(workingDir);
+    const cwd = repoRoot || workingDir;
+    await execFileAsync('git', ['restore', '--staged', '--', filePath], { cwd });
+  }
+
+  /**
+   * Discard unstaged changes for a file (git restore or git clean for untracked).
+   */
+  async discardFile(workingDir: string, filePath: string, status: string): Promise<void> {
+    const repoRoot = await this.getRepoRoot(workingDir);
+    const cwd = repoRoot || workingDir;
+    if (status === 'untracked') {
+      await execFileAsync('git', ['clean', '-f', '--', filePath], { cwd });
+    } else {
+      await execFileAsync('git', ['restore', '--', filePath], { cwd });
+    }
+  }
+
+  /**
    * Check if a file is binary by looking at the first few bytes.
    */
   private async isBinaryFile(filePath: string): Promise<boolean> {

@@ -148,7 +148,8 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.medium,
   },
   listContent: {
-    paddingVertical: spacing.xs,
+    paddingTop: spacing.xs,
+    paddingBottom: 60,
   },
   item: {
     flexDirection: 'row',

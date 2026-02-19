@@ -231,6 +231,16 @@ export class WebSocketClient {
         useFilesStore.getState().setIsGitRepo(message.data.isGitRepo);
         break;
 
+      case 'git_commit_response':
+        useFilesStore.getState().setGitFiles(message.data.files || []);
+        useToastStore.getState().addToast({
+          type: message.data.success ? 'success' : 'error',
+          message: message.data.success
+            ? (message.data.output?.split('\n')[0] || 'Committed successfully')
+            : (message.data.output || 'Commit failed'),
+        });
+        break;
+
       case 'git_status_response':
         useFilesStore.getState().setGitFiles(message.data.files);
         break;
@@ -442,6 +452,18 @@ export class WebSocketClient {
   requestFileDiff(filePath: string, staged: boolean = false, path?: string) {
     useFilesStore.getState().setDiffLoading(true);
     this.send({ type: 'git_file_diff', filePath, staged, path });
+  }
+  requestGitCommit(commitMessage: string, mode: 'commit' | 'amend' | 'push' | 'sync', path?: string) {
+    this.send({ type: 'git_commit', commitMessage, mode, path });
+  }
+  requestGitStage(filePath: string, path?: string) {
+    this.send({ type: 'git_stage', filePath, path });
+  }
+  requestGitUnstage(filePath: string, path?: string) {
+    this.send({ type: 'git_unstage', filePath, path });
+  }
+  requestGitDiscard(filePath: string, fileStatus: string, path?: string) {
+    this.send({ type: 'git_discard', filePath, fileStatus, path });
   }
   requestSearch(query: string, path?: string, options?: { maxResults?: number }) {
     useFilesStore.getState().setSearchLoading(true);

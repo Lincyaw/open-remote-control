@@ -7,6 +7,7 @@ import FileViewer from './FileViewer';
 import FileSearch from './FileSearch';
 import GitFileList from './GitFileList';
 import GitDiffViewer from './GitDiffViewer';
+import GitCommitPanel from './GitCommitPanel';
 import BinaryViewer from './BinaryViewer';
 import WorkspaceSelector from './WorkspaceSelector';
 import EmptyState from '../shared/EmptyState';
@@ -257,7 +258,10 @@ export default function FilesTab() {
       {fileLoading ? (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">Loading file...</div>
       ) : viewMode === 'git' ? (
-        <GitFileList onFileSelect={handleGitFileSelect} workspacePath={workspacePath} />
+        <div className="flex flex-col flex-1 min-h-0">
+          <GitFileList onFileSelect={handleGitFileSelect} workspacePath={workspacePath} />
+          <GitCommitPanel workspacePath={workspacePath} />
+        </div>
       ) : (
         <FileTree onFileSelect={handleFileSelect} />
       )}
