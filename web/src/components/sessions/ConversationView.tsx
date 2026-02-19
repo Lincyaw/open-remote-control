@@ -567,7 +567,7 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
+            placeholder="Type a message..."
             disabled={isSending}
             rows={1}
             className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 resize-none focus:outline-none focus:border-blue-500 disabled:opacity-50 max-h-32"
