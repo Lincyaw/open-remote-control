@@ -1,4 +1,4 @@
-const CACHE_NAME = 'renote-v1';
+const CACHE_NAME = 'orc-v1';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

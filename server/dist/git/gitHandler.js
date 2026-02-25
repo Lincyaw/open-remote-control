@@ -25,6 +25,18 @@ class GitHandler {
             case 'git_check_repo':
                 await this.handleCheckRepo(ws, message);
                 break;
+            case 'git_commit':
+                await this.handleCommit(ws, message);
+                break;
+            case 'git_stage':
+                await this.handleStage(ws, message);
+                break;
+            case 'git_unstage':
+                await this.handleUnstage(ws, message);
+                break;
+            case 'git_discard':
+                await this.handleDiscard(ws, message);
+                break;
             default:
                 logger_1.logger.warn(`Unknown git message type: ${message.type}`);
         }
@@ -62,6 +74,77 @@ class GitHandler {
                 type: 'error',
                 error: `Failed to get git status: ${error.message}`,
             });
+        }
+    }
+    async handleCommit(ws, message) {
+        try {
+            const workingDir = message.path || process.cwd();
+            const { commitMessage, mode } = message;
+            const result = await gitService_1.gitService.commit(workingDir, commitMessage || '', mode || 'commit');
+            const files = await gitService_1.gitService.getStatus(workingDir);
+            this.sendFn(ws, {
+                type: 'git_commit_response',
+                data: { success: true, output: result, files },
+            });
+        }
+        catch (error) {
+            logger_1.logger.error('Git commit error:', error);
+            const output = error.stderr?.trim() || error.message;
+            this.sendFn(ws, {
+                type: 'git_commit_response',
+                data: { success: false, output },
+            });
+        }
+    }
+    async handleStage(ws, message) {
+        try {
+            const workingDir = message.path || process.cwd();
+            const { filePath } = message;
+            if (!filePath) {
+                this.sendFn(ws, { type: 'error', error: 'File path is required for git stage' });
+                return;
+            }
+            await gitService_1.gitService.stageFile(workingDir, filePath);
+            const files = await gitService_1.gitService.getStatus(workingDir);
+            this.sendFn(ws, { type: 'git_status_response', data: { files } });
+        }
+        catch (error) {
+            logger_1.logger.error('Git stage error:', error);
+            this.sendFn(ws, { type: 'error', error: `Failed to stage file: ${error.message}` });
+        }
+    }
+    async handleUnstage(ws, message) {
+        try {
+            const workingDir = message.path || process.cwd();
+            const { filePath } = message;
+            if (!filePath) {
+                this.sendFn(ws, { type: 'error', error: 'File path is required for git unstage' });
+                return;
+            }
+            await gitService_1.gitService.unstageFile(workingDir, filePath);
+            const files = await gitService_1.gitService.getStatus(workingDir);
+            this.sendFn(ws, { type: 'git_status_response', data: { files } });
+        }
+        catch (error) {
+            logger_1.logger.error('Git unstage error:', error);
+            this.sendFn(ws, { type: 'error', error: `Failed to unstage file: ${error.message}` });
+        }
+    }
+    async handleDiscard(ws, message) {
+        try {
+            const workingDir = message.path || process.cwd();
+            const { filePath, fileStatus } = message;
+            if (!filePath) {
+                this.sendFn(ws, { type: 'error', error: 'File path is required for git discard' });
+                return;
+            }
+            await gitService_1.gitService.discardFile(workingDir, filePath, fileStatus || 'modified');
+            const files = await gitService_1.gitService.getStatus(workingDir);
+            this.sendFn(ws, { type: 'git_status_response', data: { files } });
+        }
+        catch (error) {
+            logger_1.logger.error('Git discard error:', error);
+            this.sendFn(ws, { type: 'error', error: `Failed to discard changes: ${error.message}` });
         }
     }
     async handleFileDiff(ws, message) {

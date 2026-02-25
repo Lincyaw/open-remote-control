@@ -4,6 +4,7 @@ import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import 'highlight.js/styles/github-dark.css';
 import { useSessionBrowserStore } from '../../store/sessionBrowserStore';
+import { useToastStore } from '../../store/toastStore';
 import { wsClient } from '../../services/websocket';
 import { CodeBlock, PreBlock } from './CodeBlock';
 import { useSwipeBack } from '../../hooks/useSwipeBack';
@@ -191,6 +192,7 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const addToast = useToastStore(s => s.addToast);
 
   const {
     messages, loading, subagents, sessionFolderInfo,
@@ -213,10 +215,17 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
         setCurrentSessionId(data.sessionId);
         wsClient.watchSession(workspaceDirName, data.sessionId);
         wsClient.requestSessionMessagesPage(workspaceDirName, data.sessionId);
+      } else if (!data.success && data.error) {
+        // Show error toast
+        addToast({
+          type: 'error',
+          message: data.error,
+          duration: 8000,
+        });
       }
     });
     return () => unsubscribe();
-  }, [workspaceDirName, currentSessionId]);
+  }, [workspaceDirName, currentSessionId, addToast]);
 
   // On mount, restore saved scroll position if any (set before navigating to tool view)
   const initialScrollHandled = useRef(false);

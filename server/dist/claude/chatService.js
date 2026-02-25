@@ -9,9 +9,17 @@ const logger_1 = require("../utils/logger");
 function resolveClaudePath() {
     // 1. 尝试 which/where 从当前 PATH 解析
     try {
-        const resolved = (0, child_process_1.execSync)('which claude', { encoding: 'utf-8' }).trim();
-        if (resolved)
-            return resolved;
+        const resolved = (0, child_process_1.execSync)('which claude 2>/dev/null', { encoding: 'utf-8' }).trim();
+        if (resolved && (0, fs_1.existsSync)(resolved)) {
+            // 验证文件是否可执行
+            try {
+                (0, child_process_1.execSync)(`test -x "${resolved}"`, { encoding: 'utf-8' });
+                return resolved;
+            }
+            catch {
+                logger_1.logger.warn(`[ChatService] Found claude at ${resolved} but it's not executable`);
+            }
+        }
     }
     catch {
         // which 失败，继续检查常见位置
@@ -25,8 +33,16 @@ function resolveClaudePath() {
         '/usr/bin/claude',
     ];
     for (const p of candidates) {
-        if ((0, fs_1.existsSync)(p))
-            return p;
+        if ((0, fs_1.existsSync)(p)) {
+            // 验证文件是否可执行
+            try {
+                (0, child_process_1.execSync)(`test -x "${p}"`, { encoding: 'utf-8' });
+                return p;
+            }
+            catch {
+                logger_1.logger.warn(`[ChatService] Found claude at ${p} but it's not executable`);
+            }
+        }
     }
     return null;
 }
@@ -41,6 +57,7 @@ class ClaudeChatService {
         }
         else {
             logger_1.logger.warn('[ChatService] Claude CLI not found. Reply functionality will be unavailable.');
+            logger_1.logger.warn('[ChatService] Install Claude CLI: npm install -g @anthropic-ai/claude-code');
         }
     }
     getClaudePath() {
@@ -85,7 +102,7 @@ class ClaudeChatService {
         if (!this.claudePath) {
             return {
                 success: false,
-                error: 'Claude CLI not found. Please install it and restart the server.',
+                error: 'Claude CLI not found. Please install it with: npm install -g @anthropic-ai/claude-code',
                 sessionId: effectiveSessionId,
             };
         }
@@ -131,9 +148,10 @@ class ClaudeChatService {
                 }
                 else {
                     logger_1.logger.error(`[ChatService] Claude CLI exited with code ${code}`);
+                    const errorMsg = stderr || `Claude CLI exited with code ${code}`;
                     resolve({
                         success: false,
-                        error: stderr || `Exit code: ${code}`,
+                        error: errorMsg,
                         sessionId: effectiveSessionId,
                     });
                 }
@@ -144,9 +162,14 @@ class ClaudeChatService {
                     this.runningProcesses.delete(effectiveSessionId);
                 }
                 logger_1.logger.error(`[ChatService] Failed to spawn Claude CLI:`, err);
+                // 提供更友好的错误信息
+                let errorMessage = err.message;
+                if (err.message.includes('ENOENT')) {
+                    errorMessage = `Claude CLI not found at ${this.claudePath}. Please install it with: npm install -g @anthropic-ai/claude-code`;
+                }
                 resolve({
                     success: false,
-                    error: err.message,
+                    error: errorMessage,
                     sessionId: effectiveSessionId,
                 });
             });

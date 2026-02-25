@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Renote Server 发布脚本
+# ORC Server 发布脚本
 # 用法: ./scripts/publish.sh [patch|minor|major]
 
 set -e
 
 cd "$(dirname "$0")/.."
 
-echo "=== Renote Server 发布流程 ==="
+echo "=== ORC Server 发布流程 ==="
 
 # 检查是否登录 npm
 if ! npm whoami &> /dev/null; then
@@ -53,7 +53,7 @@ npm publish
 
 echo ""
 echo "✅ 发布成功!"
-echo "   包名: renote-server"
+echo "   包名: orc-server"
 echo "   版本: $NEW_VERSION"
 echo ""
-echo "安装命令: npm install -g renote-server"
+echo "安装命令: npm install -g orc-server"

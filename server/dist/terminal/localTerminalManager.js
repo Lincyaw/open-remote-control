@@ -166,7 +166,7 @@ class ZellijTerminalConnection {
      */
     generateSessionName(sessionId, type) {
         // Use a prefix to identify our sessions
-        return `renote-${type}-${sessionId.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        return `orc-${type}-${sessionId.replace(/[^a-zA-Z0-9]/g, '-')}`;
     }
     /**
      * Check if a session exists
@@ -439,7 +439,7 @@ class ZellijTerminalConnection {
      * List alive zellij sessions managed by this server
      */
     static listManagedSessions() {
-        return listAliveZellijSessions().filter(s => s.startsWith('renote-'));
+        return listAliveZellijSessions().filter(s => s.startsWith('orc-'));
     }
     /**
      * Kill a zellij session by sessionId (without needing a connection)
@@ -447,8 +447,8 @@ class ZellijTerminalConnection {
      */
     static killSessionById(sessionId) {
         const sanitized = sessionId.replace(/[^a-zA-Z0-9]/g, '-');
-        const shellName = `renote-shell-${sanitized}`;
-        const claudeName = `renote-claude-${sanitized}`;
+        const shellName = `orc-shell-${sanitized}`;
+        const claudeName = `orc-claude-${sanitized}`;
         let killed = false;
         const existingSessions = listZellijSessions();
         if (existingSessions.includes(shellName)) {

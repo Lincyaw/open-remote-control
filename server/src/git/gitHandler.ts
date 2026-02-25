@@ -97,9 +97,10 @@ export class GitHandler {
       });
     } catch (error: any) {
       logger.error('Git commit error:', error);
+      const output = error.stderr?.trim() || error.message;
       this.sendFn(ws, {
         type: 'git_commit_response',
-        data: { success: false, output: error.message },
+        data: { success: false, output },
       });
     }
   }

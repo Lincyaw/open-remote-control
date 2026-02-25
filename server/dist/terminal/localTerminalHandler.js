@@ -142,21 +142,21 @@ class LocalTerminalHandler {
     }
     /**
      * List all managed zellij sessions (survives reconnects)
-     * Parses session names like "renote-shell-xxx" / "renote-claude-xxx"
+     * Parses session names like "orc-shell-xxx" / "orc-claude-xxx"
      */
     handleListManaged(ws) {
         const managedSessions = localTerminalManager_1.ZellijTerminalConnection.listManagedSessions();
         const terminals = managedSessions.map((name) => {
-            // Parse "renote-{type}-{sanitizedId}" pattern
+            // Parse "orc-{type}-{sanitizedId}" pattern
             let type = 'shell';
             let sessionId = name;
-            if (name.startsWith('renote-shell-')) {
+            if (name.startsWith('orc-shell-')) {
                 type = 'shell';
-                sessionId = name.substring('renote-shell-'.length);
+                sessionId = name.substring('orc-shell-'.length);
             }
-            else if (name.startsWith('renote-claude-')) {
+            else if (name.startsWith('orc-claude-')) {
                 type = 'claude';
-                sessionId = name.substring('renote-claude-'.length);
+                sessionId = name.substring('orc-claude-'.length);
             }
             return {
                 sessionId,

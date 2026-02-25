@@ -207,16 +207,16 @@ export default function FilesTab() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800">
+      <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 border-b border-gray-800">
         <WorkspaceSelector
           currentPath={rootPath}
           onSwitch={handleSwitchWorkspace}
         />
         {isGitRepo && (
-          <div className="flex bg-gray-800 rounded-lg overflow-hidden">
+          <div className="flex bg-gray-800 rounded-lg overflow-hidden shrink-0">
             <button
               onClick={() => useFilesStore.getState().setViewMode('normal')}
-              className={`px-3 py-1 text-xs transition-colors ${
+              className={`px-2 sm:px-3 py-1 text-xs transition-colors ${
                 viewMode === 'normal' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
               }`}
             >
@@ -227,7 +227,7 @@ export default function FilesTab() {
                 useFilesStore.getState().setViewMode('git');
                 wsClient.requestGitStatus(workspacePath || undefined);
               }}
-              className={`px-3 py-1 text-xs transition-colors ${
+              className={`px-2 sm:px-3 py-1 text-xs transition-colors ${
                 viewMode === 'git' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
               }`}
             >
@@ -238,7 +238,7 @@ export default function FilesTab() {
         <div className="flex-1" />
         <button
           onClick={handleToggleSearch}
-          className="text-xs text-gray-400 hover:text-gray-200 px-2"
+          className="text-xs text-gray-400 hover:text-gray-200 px-1.5 sm:px-2 shrink-0"
           title="Search files"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -248,9 +248,13 @@ export default function FilesTab() {
         </button>
         <button
           onClick={viewMode === 'git' ? handleRefreshGit : handleRefreshTree}
-          className="text-xs text-gray-400 hover:text-gray-200 px-2"
+          className="text-xs text-gray-400 hover:text-gray-200 px-1.5 sm:px-2 shrink-0"
+          title="Refresh"
         >
-          Refresh
+          <svg className="sm:hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2" />
+          </svg>
+          <span className="hidden sm:inline">Refresh</span>
         </button>
       </div>
 

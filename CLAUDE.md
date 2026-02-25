@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Renote is a mobile remote development client for SSH/WebSocket-based server integration, designed for Claude Code monitoring and remote terminal access. It consists of a Node.js WebSocket server and a React Native mobile app.
+OpenRemoteControl is a mobile remote development client for SSH/WebSocket-based server integration, designed for Claude Code monitoring and remote terminal access. It consists of a Node.js WebSocket server and a React Native mobile app.
 
 ## Build & Development Commands
 

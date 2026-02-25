@@ -1,6 +1,6 @@
 {
-  "name": "Renote",
-  "short_name": "Renote",
+  "name": "OpenRemoteControl",
+  "short_name": "ORC",
   "description": "Remote development client for Claude Code",
   "start_url": "/",
   "display": "standalone",

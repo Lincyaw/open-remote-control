@@ -19,7 +19,7 @@ export default function Sidebar({ tabs, activeTab, onTabChange, collapsed }: Sid
     <div className={`flex flex-col bg-gray-900 border-r border-gray-800 ${collapsed ? 'w-16' : 'w-48'} transition-all`}>
       <div className={`py-4 ${collapsed ? 'px-2' : 'px-4'} border-b border-gray-800`}>
         <h1 className={`font-bold text-blue-400 ${collapsed ? 'text-center text-xs' : 'text-lg'}`}>
-          {collapsed ? 'R' : 'Renote'}
+          {collapsed ? 'O' : 'ORC'}
         </h1>
       </div>
 
@@ -48,7 +48,7 @@ export default function Sidebar({ tabs, activeTab, onTabChange, collapsed }: Sid
 
       <div className={`py-3 ${collapsed ? 'px-2' : 'px-4'} border-t border-gray-800`}>
         <div className={`text-xs text-gray-600 ${collapsed ? 'text-center' : ''}`}>
-          {collapsed ? 'v1' : 'Renote Web v1.0'}
+          {collapsed ? 'v1' : 'ORC Web v1.0'}
         </div>
       </div>
     </div>

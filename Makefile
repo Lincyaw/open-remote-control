@@ -14,27 +14,27 @@ install: build
 
 # systemd service management
 start:
-	systemctl --user start renote-server
+	systemctl --user start orc-server
 
 stop:
-	systemctl --user stop renote-server
+	systemctl --user stop orc-server
 
 restart:
-	systemctl --user restart renote-server
+	systemctl --user restart orc-server
 
 status:
-	systemctl --user status renote-server
+	systemctl --user status orc-server
 
 logs:
-	journalctl --user -u renote-server -f
+	journalctl --user -u orc-server -f
 
 # Install systemd service + enable on boot
 setup:
 	mkdir -p ~/.config/systemd/user
-	cp server/renote-server.service ~/.config/systemd/user/
+	cp server/orc-server.service ~/.config/systemd/user/
 	systemctl --user daemon-reload
-	systemctl --user enable renote-server
+	systemctl --user enable orc-server
 
 # Build, install globally, restart service
 deploy: install
-	systemctl --user restart renote-server
+	systemctl --user restart orc-server

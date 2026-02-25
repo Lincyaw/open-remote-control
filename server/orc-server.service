@@ -1,5 +1,5 @@
 [Unit]
-Description=Renote Server - Remote Dev Client for Claude Code
+Description=ORC Server - OpenRemoteControl for Claude Code
 After=network.target
 
 [Service]
@@ -9,7 +9,7 @@ Environment=PORT=9080
 Environment=AUTH_TOKEN=
 Environment=CLAUDE_HOME=/home/nn/.claude
 Environment=LOG_LEVEL=info
-ExecStart=/home/nn/.nvm/versions/node/v25.2.1/bin/node /home/nn/.nvm/versions/node/v25.2.1/bin/renote-server
+ExecStart=/home/nn/.nvm/versions/node/v25.2.1/bin/node /home/nn/.nvm/versions/node/v25.2.1/bin/orc-server
 Restart=on-failure
 RestartSec=5
 

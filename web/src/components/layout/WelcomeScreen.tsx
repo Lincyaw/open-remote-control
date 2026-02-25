@@ -38,7 +38,7 @@ export default function WelcomeScreen() {
               <path d="M24.5 24l1 1 2-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-100">Renote</h1>
+          <h1 className="text-2xl font-bold text-gray-100">OpenRemoteControl</h1>
           <p className="text-sm text-gray-500 mt-1">Remote Claude Code Monitor</p>
         </div>
 

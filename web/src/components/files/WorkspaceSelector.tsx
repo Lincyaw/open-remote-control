@@ -56,7 +56,7 @@ export default function WorkspaceSelector({ currentPath, onSwitch }: Props) {
     <div className="relative" ref={popoverRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-xs text-gray-300 hover:text-gray-100 bg-gray-800 rounded px-2 py-1 max-w-[180px] transition-colors"
+        className="flex items-center gap-1 text-xs text-gray-300 hover:text-gray-100 bg-gray-800 rounded px-2 py-1 max-w-[120px] sm:max-w-[180px] transition-colors"
         title={currentPath || 'Server default'}
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
