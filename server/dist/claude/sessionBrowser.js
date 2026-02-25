@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getSessionFilePath = getSessionFilePath;
 exports.watchSession = watchSession;
 exports.unwatchSession = unwatchSession;
+exports.resolveDirNameToPath = resolveDirNameToPath;
 exports.listWorkspaces = listWorkspaces;
 exports.listSessions = listSessions;
 exports.getSessionMessages = getSessionMessages;

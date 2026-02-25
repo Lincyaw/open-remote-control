@@ -7,7 +7,7 @@ import { ClientMessage, ServerMessage, FileTreeExpandMessage } from '../types';
 import { fileBrowser } from '../files/browser';
 import { fileReader } from '../files/reader';
 import { searchService } from '../files/search';
-import { listWorkspaces, listSessions, getSessionMessages, getSessionMessagesPage, watchSession, unwatchSession, listSubagents, getSubagentMessages, listToolResults, getToolResultContent, getSessionFolderInfo } from '../claude/sessionBrowser';
+import { listWorkspaces, listSessions, getSessionMessages, getSessionMessagesPage, watchSession, unwatchSession, listSubagents, getSubagentMessages, listToolResults, getToolResultContent, getSessionFolderInfo, resolveDirNameToPath } from '../claude/sessionBrowser';
 import { LocalTerminalHandler } from '../terminal';
 import { GitHandler } from '../git';
 import { terminalWebSocketHandler } from '../terminal/terminalWebSocket';
@@ -609,7 +609,7 @@ export class WebSocketServer {
       const { workspaceDirName, sessionId, newSessionId, message: userMessage, allowedTools } = data;
 
       // 解码 workspaceDirName 为实际路径
-      const cwd = '/' + workspaceDirName.replace(/-/g, '/');
+      const cwd = await resolveDirNameToPath(workspaceDirName);
 
       logger.info(`[SendClaudeMessage] Sending message to Claude CLI`);
       logger.info(`[SendClaudeMessage] CWD: ${cwd}`);

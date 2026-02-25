@@ -195,7 +195,7 @@ function decodeWorkspacePath(dirName: string): string {
  * making it ambiguous. We probe the filesystem trying "-", "_", and "/" as joiners
  * between segments to find the real path.
  */
-async function resolveDirNameToPath(dirName: string): Promise<string> {
+export async function resolveDirNameToPath(dirName: string): Promise<string> {
   const segments = dirName.split('-').filter(Boolean);
   if (segments.length === 0) return '/';
 

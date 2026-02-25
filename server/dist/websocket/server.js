@@ -546,7 +546,7 @@ class WebSocketServer {
             }
             const { workspaceDirName, sessionId, newSessionId, message: userMessage, allowedTools } = data;
             // 解码 workspaceDirName 为实际路径
-            const cwd = '/' + workspaceDirName.replace(/-/g, '/');
+            const cwd = await (0, sessionBrowser_1.resolveDirNameToPath)(workspaceDirName);
             logger_1.logger.info(`[SendClaudeMessage] Sending message to Claude CLI`);
             logger_1.logger.info(`[SendClaudeMessage] CWD: ${cwd}`);
             logger_1.logger.info(`[SendClaudeMessage] SessionId: ${sessionId || 'none'}`);
